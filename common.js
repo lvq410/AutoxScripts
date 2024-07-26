@@ -87,6 +87,7 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
                 img.recycle();
                 thresholdImgs.push(thresholdImg);
             });
+            imgs = thresholdImgs;
         }
         if (LogEnable) log('等待图片出现', imgNames);
         var img; var imgPoint; //找到的图片及其位置

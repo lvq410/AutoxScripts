@@ -28,7 +28,7 @@ import lombok.Cleanup;
  */
 public class FtpSyncHelper{
 
-    private static final HostAndPort FtpServer = HostAndPort.fromParts("192.168.0.102", 3721);
+    private static final HostAndPort FtpServer = HostAndPort.fromParts("10.236.222.115", 3721);
     private static final String FtpUser = "anonymous";
     private static final String FtpPassword = "";
     private static final String FtpWorkPath = "/脚本";

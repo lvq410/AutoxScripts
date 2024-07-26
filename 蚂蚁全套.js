@@ -11,7 +11,7 @@ common.setCaptureScreenLandscape(false);
 common.setMediaDir(MediaDir);
 common.setSaveCaptureScreen(false);
 common.setLogEnable(LogEnable);
-common.setSaveOcrRst(true);
+common.setSaveOcrRst(false);
 
 //==================================================================================================全局变量
 var Run = false;
@@ -103,6 +103,10 @@ function main(){
     
     var msg = manor();
     if(msg) return msg;
+    sleep(1000);
+    
+    var msg = taobaoFarm();
+    if(msg) return msg;
 }
 
 //==================================================================================================蚂蚁森林
@@ -125,9 +129,15 @@ function forest(){
     forest_fallenLeaves();
     
     ui.run(() => { w.text.setText('收个人能量'); });
-    for(var y = (650/2448)*device.height; y< (870/2448)*device.height; y+=50){
+    var btn = id('J_pop_treedialog_close').findOnce();
+    if(btn) common.clickIfParent(btn);
+    press((525/1080)*device.width, (900/2448)*device.height,1);
+    var btn = id('J_pop_treedialog_close').findOne(3000);
+    if(btn) {common.clickIfParent(btn); sleep(3000);}
+    
+    for(var y = (700/2448)*device.height; y< (870/2448)*device.height; y+=50){
         for(var x = (150/1080)*device.width; x < device.width - (150/1080)*device.width; x+= (50/1080)*device.width ) {
-            press(x, y, 1)
+            press(x, y, 1);
         }
     }
 
@@ -169,10 +179,8 @@ function forest_fallenLeaves(){
     
     log('等待【活力值奖励】弹窗打开')
     var btn = textMatches(/.*活力值兑换.*/).findOne(5000);
-    if (!btn) {
-        throw new Error('超时未打开【活力值奖励】弹窗');
-    }
-    log('已打开【活力值奖励】弹窗')
+    if (!btn) throw new Error('超时未打开【活力值奖励】弹窗');
+    log('已打开【活力值奖励】弹窗'); sleep(2000);
     
     log('检查【领取】'); ui.run(() => { w.text.setText('检查并点击【领取】'); });
     var btn = text('领取').findOne(2000);
@@ -185,6 +193,34 @@ function forest_fallenLeaves(){
         if(btn){
             log('出现7日宝箱提醒，点击【知道了】关闭之');
             common.clickIfParent(btn);
+        }
+    }
+    
+    log('检查【连续收7天自己能量】'); ui.run(() => { w.text.setText('检查并点击【连续收7天自己能量】'); });
+    var  btn = text('连续收7天自己能量').findOnce();
+    if(btn){
+        log('找到【连续收7天自己能量】，检查其【立即领取】');
+        var btn = btn.parent().parent().findOne(text('立即领取'));
+        if(btn){
+            log('找到并点击【连续收7天自己能量】的【立即领取】', btn.bounds());
+            common.clickIfParent(btn); sleep(2000);
+            
+        }else{
+            log('未找到【连续收7天自己能量】的【立即领取】');
+        }
+    }
+    
+    log('检查【领取能量双击卡】'); ui.run(() => { w.text.setText('检查并点击【领取能量双击卡】'); });
+    var  btn = text('领取能量双击卡').findOnce();
+    if(btn){
+        log('找到【领取能量双击卡】，检查其【立即领取】');
+        var btn = btn.parent().parent().findOne(text('立即领取'));
+        if(btn){
+            log('找到并点击【领取能量双击卡】的【立即领取】', btn.bounds());
+            common.clickIfParent(btn); sleep(2000);
+            
+        }else{
+            log('未找到【领取能量双击卡】的【立即领取】');
         }
     }
     
@@ -242,15 +278,15 @@ function forest_fallenLeaves(){
 function forest_findEnergy() {
     while(true){
         ui.run(() => { w.text.setText('识别并点击【找能量】'); });
-        var point = common.clickImg('找能量.jpg', {waitDisappearTimeout:3000});
+        var point = common.clickImg(['找能量.jpg','找能量3.jpg','找能量2.jpg'], {waitDisappearTimeout:3000});
         if(!point) return '未找到【找能量】';
         
         //再次寻找【找能量】，如果找不到，说明已经收完
-        point = common.clickImg('找能量.jpg', {waitDisplayTimeout:2000, doClick:false});
+        point = common.clickImg(['找能量.jpg','找能量3.jpg','找能量2.jpg'], {waitDisplayTimeout:2000, doClick:false});
         if(!point) return;
         
         ui.run(() => { w.text.setText('识别并点击【一键收】'); });
-        common.clickImg('一键收.jpg', {waitDisappearTimeout:2000});
+        common.clickImg(['一键收.jpg','一键收2.jpg'], {waitDisappearTimeout:2000});
     }
 }
 
@@ -320,7 +356,11 @@ function farm(){
     else return '超时未打开【芭芭农场】';
     closeDialog()
     
+    log('检查【点击领取】'); ui.run(() => { w.text.setText('检查【点击领取】'); });
     common.clickImg('农场-点击领取.jpg');
+    log('检查并关闭可能的弹窗'); ui.run(() => { w.text.setText('检查并关闭可能的弹窗'); });
+    var btn = text('关闭').depth().findOne(3000);
+    if(btn) common.clickIfParent(btn);
     
     common.clickImg('农场-除草-收获.jpg');
     
@@ -362,22 +402,23 @@ function farm(){
     for(var i = 0; i < 4; i++) {
         var did = false;
         do{
+            farm_receive();
             did = false;
-            did |= farm_simple(/.*逛一逛支付宝会员.*/, '去完成');
-            did |= farm_simple(/.*逛一逛蚂蚁庄园.*/, '去完成');
-            did |= farm_simple(/.*去森林种树挑战赛看一看.*/, '去逛逛');
-            did |= farm_simple(/.*去积攒芝麻粒.*/, '去逛逛');
-            did |= farm_simple(/.*逛一逛乐动力频道.*/, '去逛逛');
+            did |= farm_simple(/.*逛一逛支付宝会员.*/, /去完成|去逛逛/);
+            did |= farm_simple(/.*逛一逛蚂蚁庄园.*/, /去完成|去逛逛/);
+            did |= farm_simple(/.*去森林种树挑战赛看一看.*/, /去完成|去逛逛/);
+            did |= farm_simple(/.*去积攒芝麻粒.*/, /去完成|去逛逛/);
+            did |= farm_simple(/.*逛一逛乐动力频道.*/, /去完成|去逛逛/);
             
-            did |= farm_intent(/.*逛一逛快手.*/, '去完成');
-            did |= farm_intent(/.*逛逛淘宝芭芭农场.*/, '去逛逛');
-            did |= farm_intent(/.*体验抖音极速版.*/, '去完成');
-            did |= farm_intent(/.*去中国移动领福利.*/, '去完成');
-            did |= farm_intent(/.*去百度地图领现金.*/, '去完成');
-            did |= farm_intent(/.*逛一逛签到领现金.*/, '去完成');
-            did |= farm_intent(/.*逛一逛领淘宝红包.*/, '去完成');
-            //did |= farm_intent(/.*体验番茄小说.*/, '去完成');
-            did |= farm_intent(/.*逛淘宝看视频领现金.*/, '去完成');
+            did |= farm_intent(/.*逛一逛快手.*/, /去完成|去逛逛/);
+            did |= farm_intent(/.*逛逛淘宝芭芭农场.*/, /去完成|去逛逛/);
+            did |= farm_intent(/.*体验抖音极速版.*/, /去完成|去逛逛/);
+            did |= farm_intent(/.*去中国移动领福利.*/, /去完成|去逛逛/);
+            did |= farm_intent(/.*去百度地图领现金.*/, /去完成|去逛逛/);
+            did |= farm_intent(/.*逛一逛签到领现金.*/, /去完成|去逛逛/);
+            did |= farm_intent(/.*逛一逛领淘宝红包.*/, /去完成|去逛逛/);
+            //did |= farm_intent(/.*体验番茄小说.*/, /去完成|去逛逛/);
+            did |= farm_intent(/.*逛淘宝看视频领现金.*/, /去完成|去逛逛/);
         }while(did)
         
         swipe(device.width / 2, device.height/2, device.width / 2, 0, 500);
@@ -437,8 +478,10 @@ function farm_manorChickManure(){
     ui.run(() => { w.text.setText('点击【蚂蚁庄园小鸡肥料】的【领取】'); });
     common.clickIfParent(btn); sleep(1000)
 }
-
-function farm_simple(jobTitlePattern, jobEnterBtnText){
+var FarmSimpleCount = {};
+function farm_simple(jobTitlePattern, jobEnterBtnPattern){
+    if((FarmSimpleCount[jobTitlePattern]||0) > 2) return;
+    
     log('检查【'+jobTitlePattern+'】'); ui.run(() => { w.text.setText('检查【'+jobTitlePattern+'】'); });
     var btn = textMatches(jobTitlePattern).findOnce();
     if(!btn) {
@@ -450,20 +493,20 @@ function farm_simple(jobTitlePattern, jobEnterBtnText){
     if(!visible) return;
     
     var entryBtn = btn;
-    log('检查【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】按钮');
+    log('检查【'+jobTitlePattern+'】的【'+jobEnterBtnPattern+'】按钮');
     var btn = null;
-    text(jobEnterBtnText).find().forEach(function(b) {
+    textMatches(jobEnterBtnPattern).find().forEach(function(b) {
         if(b.bounds().top> entryBtn.bounds().top && b.bounds().top < entryBtn.bounds().bottom) btn = b;
     });
     if(!btn){
-        log('未找到【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】按钮');
+        log('未找到【'+jobTitlePattern+'】的【'+jobEnterBtnPattern+'】按钮');
         return;
     }
     var visible = common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()});
-    log('找到【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】按钮，坐标', btn.bounds(), '是否可见', visible);
+    log('找到【'+jobTitlePattern+'】的【'+jobEnterBtnPattern+'】按钮，坐标', btn.bounds(), '是否可见', visible);
     if(!visible) return;
-    log('点击【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】');
-    ui.run(() => { w.text.setText('点击【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】'); });
+    log('点击【'+jobTitlePattern+'】的【'+jobEnterBtnPattern+'】');
+    ui.run(() => { w.text.setText('点击【'+jobTitlePattern+'】的【'+jobEnterBtnPattern+'】'); });
     common.clickIfParent(btn); sleep(5000)
     
     log('开始后退 返回农场'); ui.run(() => { w.text.setText('后退 返回农场'); });
@@ -477,12 +520,16 @@ function farm_simple(jobTitlePattern, jobEnterBtnText){
     }
     
     farm_receive();
+    
+    FarmSimpleCount[jobTitlePattern] = (FarmSimpleCount[jobTitlePattern]||0) + 1;
     return true;
 }
+var FarmIntentCount = {};
 /**
  * 芭芭农场里简单的跳到另一个app后再回退就能完成的任务
  */
-function farm_intent(jobTitlePattern, jobEnterBtnText){
+function farm_intent(jobTitlePattern, jobEnterBtnPattern){
+    if((FarmIntentCount[jobTitlePattern]||0) > 2) return;
     log('检查【'+jobTitlePattern+'】'); ui.run(() => { w.text.setText('检查【'+jobTitlePattern+'】'); });
     var btn = textMatches(jobTitlePattern).findOnce();
     if(!btn) {
@@ -494,19 +541,19 @@ function farm_intent(jobTitlePattern, jobEnterBtnText){
     if(!visible) return;
     
     var entryBtn = btn;
-    log('检查【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】按钮');
+    log('检查【'+jobTitlePattern+'】的【'+jobEnterBtnPattern+'】按钮');
     var btn = null;
-    text(jobEnterBtnText).find().forEach(function(b) {
+    textMatches(jobEnterBtnPattern).find().forEach(function(b) {
         if(b.bounds().top> entryBtn.bounds().top && b.bounds().top < entryBtn.bounds().bottom) btn = b;
     });
     if(!btn){
-        log('未找到【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】按钮');
+        log('未找到【'+jobTitlePattern+'】的【'+jobEnterBtnPattern+'】按钮');
         return;
     }
     var visible = common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()});
-    log('找到【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】按钮，坐标', btn.bounds(), '是否可见', visible);
+    log('找到【'+jobTitlePattern+'】的【'+jobEnterBtnPattern+'】按钮，坐标', btn.bounds(), '是否可见', visible);
     if(!visible) return;
-    log('点击【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】'); ui.run(() => { w.text.setText('点击【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】'); });
+    log('点击【'+jobTitlePattern+'】的【'+jobEnterBtnPattern+'】'); ui.run(() => { w.text.setText('点击【'+jobTitlePattern+'】的【'+jobEnterBtnPattern+'】'); });
     common.clickIfParent(btn); sleep(10000)
     
     log('回到支付宝')
@@ -524,6 +571,7 @@ function farm_intent(jobTitlePattern, jobEnterBtnText){
     }
     
     farm_receive();
+    FarmIntentCount[jobTitlePattern] = (FarmIntentCount[jobTitlePattern]||0) + 1;
     return true;
 }
 function farm_receive(){
@@ -599,7 +647,7 @@ function manor(){
         manor_lottery(); manor_lottery();
         
         //向上滑动半屏
-        swipe(device.width / 2, device.height/2, device.width / 2, 0, 1000);
+        swipe(device.width / 2, device.height/2, device.width / 2, 0, 1500);
     }
     
     ui.run(() => { w.text.setText('关闭【领饲料】'); });
@@ -618,6 +666,8 @@ function manor(){
     }
     
     manor_diary();
+    
+    manor_help();
 }
 function manor_answer(){
     ui.run(() => { w.text.setText('检查【去答题】'); });
@@ -1078,61 +1128,76 @@ function taobaoFarm(){
         taobaoFarm_closePopup();
     }
     
-    while(true){
-        log('检查【剩余施肥次数】'); ui.run(() => { w.text.setText('检查【剩余施肥次数】'); });
-        var remainOcr = common.clickOcr(/.*(还差[0-9]+次可拆|可拆开).*/, {doClick:false,threshold:0.8});
-        if(!remainOcr) {
-            log('未找到【剩余施肥次数】');
-            break;
-        }
-        log('找到【剩余施肥次数】，坐标', remainOcr);
-        
-        if(/.*可拆开.*/.test(remainOcr.text)){
-            log('点击【可拆开】'); ui.run(() => { w.text.setText('点击【可拆开】'); });
-            press(remainOcr.x, remainOcr.y, 1); sleep(3000)
-            taobaoFarm_closePopup();
-            continue;
-        }
-        
-        var num = parseInt(remainOcr.text.match(/还差([0-9]+)次可拆/)[1]);
-        log('提取到还差', num, '次可拆');
-        
-        var fertilizeOcr;
-        for(var i=0; i<num; i++){
-            if(!fertilizeOcr){
-                log('检查【施肥】'); ui.run(() => { w.text.setText('检查【施肥】'); });
-                var fertilizeOcr = common.clickOcr(/^施肥$/);
-                if(!fertilizeOcr) throw new Error('未找到【施肥】');
-                log('找到【施肥】，坐标', fertilizeOcr);
-            }
-            press(fertilizeOcr.x, fertilizeOcr.y, 1);sleep(3000);
-            taobaoFarm_closePopup();
-        }
-    }
+//    while(true){
+//        log('检查【剩余施肥次数】'); ui.run(() => { w.text.setText('检查【剩余施肥次数】'); });
+//        var remainOcr = common.clickOcr(/.*(还差[0-9]+次可拆|可拆开).*/, {doClick:false,threshold:0.8});
+//        if(!remainOcr) {
+//            log('未找到【剩余施肥次数】');
+//            break;
+//        }
+//        log('找到【剩余施肥次数】，坐标', remainOcr);
+//        
+//        if(/.*可拆开.*/.test(remainOcr.text)){
+//            log('点击【可拆开】'); ui.run(() => { w.text.setText('点击【可拆开】'); });
+//            press(remainOcr.x, remainOcr.y, 1); sleep(3000)
+//            taobaoFarm_closePopup();
+//            continue;
+//        }
+//        
+//        var num = parseInt(remainOcr.text.match(/还差([0-9]+)次可拆/)[1]);
+//        log('提取到还差', num, '次可拆');
+//        
+//        var fertilizeOcr;
+//        for(var i=0; i<num; i++){
+//            if(!fertilizeOcr){
+//                log('检查【施肥】'); ui.run(() => { w.text.setText('检查【施肥】'); });
+//                var fertilizeOcr = common.clickOcr(/^施肥$/);
+//                if(!fertilizeOcr) throw new Error('未找到【施肥】');
+//                log('找到【施肥】，坐标', fertilizeOcr);
+//            }
+//            press(fertilizeOcr.x, fertilizeOcr.y, 1);sleep(3000);
+//            taobaoFarm_closePopup();
+//        }
+//    }
     
-    log('检查【去打卡】'); ui.run(() => { w.text.setText('检查【去打卡】'); });
-    var btn = text('去打卡').findOnce();
-    if(btn) {
-        log('找到【去打卡】，坐标', btn.bounds());
-        press(btn.bounds().centerX(), btn.bounds().centerY(), 1); sleep(2000)
-        log('检查【点击打卡】'); ui.run(() => { w.text.setText('检查【点击打卡】'); });
-        var punchOcr = common.clickOcr(/^点击打卡$/);
-        if(!punchOcr) throw new Error('未找到【点击打卡】');
-        log('找到【点击打卡】，坐标', punchOcr);
-        
-        log('检查打卡的【关闭】'); ui.run(() => { w.text.setText('检查打卡的【关闭】'); });
-        var btn = className('android.widget.Button').clickable().boundsInside(900,200,1100,400).findOne(2000);
-        
-    }else{
-        log('未找到【去打卡】');
-    }
+//    log('检查【去打卡】'); ui.run(() => { w.text.setText('检查【去打卡】'); });
+//    var btn = text('去打卡').findOnce();
+//    if(btn) {
+//        log('找到【去打卡】，坐标', btn.bounds());
+//        press(btn.bounds().centerX(), btn.bounds().centerY(), 1); sleep(2000)
+//        log('检查【点击打卡】'); ui.run(() => { w.text.setText('检查【点击打卡】'); });
+//        var punchOcr = common.clickOcr(/^点击打卡$/);
+//        if(!punchOcr) throw new Error('未找到【点击打卡】');
+//        log('找到【点击打卡】，坐标', punchOcr);
+//        
+//        log('检查打卡的【关闭】'); ui.run(() => { w.text.setText('检查打卡的【关闭】'); });
+//        var btn = className('android.widget.Button').clickable().boundsInside(900,200,1100,400).findOne(2000);
+//        
+//    }else{
+//        log('未找到【去打卡】');
+//    }
     
-/*    var btn = text('集肥料').findOne(5000);
-    if(!btn) return '超时未打开【芭芭农场】';
-    log('找到【集肥料】，坐标', btn.bounds());
+    log('检查【集肥料】'); ui.run(() => { w.text.setText('检查【集肥料】'); });
+    var taskBtn = text('集肥料').findOne(5000);
+    if(!taskBtn) return '超时未打开【芭芭农场】';
+    log('找到【集肥料】，坐标', taskBtn.bounds());
     
-    log('点击【集肥料】');
-    press(btn.bounds().centerX(), btn.bounds().centerY(), 1); sleep(2000)*/
+    log('点击【集肥料】'); ui.run(() => { w.text.setText('点击【集肥料】'); });
+    press(taskBtn.bounds().centerX(), taskBtn.bounds().centerY(), 1); sleep(2000)
+    
+    while(taobaoFarm_browser()){};
+    
+    taobaoFarm_answer();
+    log('点击【集肥料】'); ui.run(() => { w.text.setText('点击【集肥料】'); });
+    press(taskBtn.bounds().centerX(), taskBtn.bounds().centerY(), 1); sleep(2000)
+
+    while(taobaoFarm_browser()){};
+    
+    taobaoFarm_intend(/.*逛支付宝芭芭农.*/, /去完成/);
+//    for(var i=0; i<2; i++){
+//        //向上滑动半屏
+//        swipe(device.width / 2, device.height/2, device.width / 2, 0, 1000);
+//    }
 }
 
 function taobaoFarm_closePopup(){
@@ -1146,6 +1211,96 @@ function taobaoFarm_closePopup(){
         log('找到并点击农场弹窗关闭按钮，坐标', point); ui.run(() => { w.text.setText('找到并点击农场弹窗关闭按钮'); });
         sleep(3000)
     }
+}
+
+function taobaoFarm_answer(){
+    log('检查【农场百科问答】'); ui.run(() => { w.text.setText('检查【农场百科问答】'); });
+    var btn = common.clickOcr(/.*农场百科问.*/, {doClick:false,threshold:0.8,offset:{x:0,y:0}});
+    if(!btn){
+        log('未找到【农场百科问答】');
+        return;
+    }
+    log('找到【农场百科问答】，坐标', btn);
+    
+    log('检查【农场百科问答】的【去答题】'); ui.run(() => { w.text.setText('检查【农场百科问答】的【去答题】'); });
+    var btn = common.clickOcr(/.*去答题.*/, {doClick:true,threshold:0.8,region:[btn.x,btn.y,device.width,200]});
+    if (!btn) {
+        log('未找到【去答题】');
+        return;
+    }
+    log('找到【去答题】，坐标', btn);
+    
+    log('点击【去答题】'); ui.run(() => { w.text.setText('点击【去答题】'); });
+    press(btn.x, btn.y, 1); sleep(2000)
+    
+    log('检查答案按钮'); ui.run(() => { w.text.setText('检查答案按钮'); });
+    var btn = clickable().className('android.widget.Button').depth(19).textMatches(/.+/).boundsInside(0,device.height/2,device.width,device.height).findOne(2000);
+    if(!btn) throw new Error('超时未找到答案按钮');
+    log('找到答案按钮，答案', btn.text(), '坐标', btn.bounds());
+    
+    log('点击答案按钮'); ui.run(() => { w.text.setText('点击答案按钮'); });
+    common.clickIfParent(btn); sleep(2000);
+    
+    var btn = textMatches(/领取(奖励|鼓励).*/).findOne(2000);
+    if (!btn) throw new Error('超时未找到【领取奖励】');
+    log('找到【领取奖励】，坐标', btn.bounds());
+    common.clickIfParent(btn); sleep(2000);
+    return true;
+}
+
+function taobaoFarm_browser(){
+    var pattern = /.*(严选推荐商|一搜你喜欢的商|精选好|一搜你心仪的宝|浏览最高.*300|浏览15秒.*300).*/
+    log('检查'+pattern); ui.run(() => { w.text.setText('检查'+pattern); });
+    var btn = common.clickOcr(pattern, {doClick:false,threshold:0.8,offset:{x:0,y:0}});
+    if(!btn){
+        log('未找到'+pattern);
+        return;
+    }
+    log('找到', pattern, '，坐标', btn);
+    
+    var btnPattern = /.*去完成.*/
+    log('检查'+pattern+'的'+btnPattern); ui.run(() => { w.text.setText('检查'+btnPattern); });
+    var region = [btn.x,btn.y,device.width,200];
+    if(btn.text.match(/.*(浏览最高.*300|浏览15秒.*300).*/)) region[1] = btn.y-100;
+    var btn = common.clickOcr(btnPattern, {doClick:true,threshold:0.8,region:region});
+    if (!btn) {
+        log('未找到'+btnPattern);
+        return;
+    }
+    log('找到'+btnPattern+'，坐标', btn);
+    
+    log('点击'+btnPattern); ui.run(() => { w.text.setText('点击'+btnPattern); });
+    press(btn.x, btn.y, 1); sleep(2000)
+    
+    browser_ad();
+    
+    return true;
+}
+
+function taobaoFarm_intend(pattern, btnPattern){
+    log('检查'+pattern); ui.run(() => { w.text.setText('检查'+pattern); });
+    var btn = common.clickOcr(pattern, {doClick:false,threshold:0.8,offset:{x:0,y:0}});
+    if(!btn){
+        log('未找到'+pattern);
+        return;
+    }
+    log('找到', pattern, '，坐标', btn);
+    
+    log('检查'+pattern+'的'+btnPattern); ui.run(() => { w.text.setText('检查'+btnPattern); });
+    var btn = common.clickOcr(btnPattern, {doClick:true,threshold:0.8,region:[btn.x,btn.y,device.width,200]});
+    if (!btn) {
+        log('未找到'+btnPattern);
+        return;
+    }
+    log('找到'+btnPattern+'，坐标', btn);
+    
+    log('点击'+btnPattern); ui.run(() => { w.text.setText('点击'+btnPattern); });
+    press(btn.x, btn.y, 1);sleep(10000);
+        
+    log('回到淘宝')
+    launch('com.taobao.taobao'); sleep(7000)
+    
+    return true;
 }
 
 //==================================================================================================公共函数
@@ -1301,6 +1456,5 @@ function closeDialog(){
 
 //==================================================================================================测试
 function test(){
-    manor_help();
-    //browser_ad()
+    taobaoFarm_browser()
 }
