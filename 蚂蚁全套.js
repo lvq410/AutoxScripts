@@ -1315,7 +1315,7 @@ function browser_ad(){
     var markText = btn.text();
     
     var guessSearchFlag = false;
-    if('搜索有福利'==markText){
+    function guessSearchJump(){
         log('当前是【搜索有福利】页，检查【猜你想搜】'); ui.run(() => { w.text.setText('当前是【搜索有福利】页，检查【猜你想搜】'); });
         var btn = text('猜你想搜').findOnce();
         if (btn) {
@@ -1332,6 +1332,7 @@ function browser_ad(){
             log('未找到【猜你想搜】');
         }
     }
+    if('搜索有福利'==markText) guessSearchJump();
     
     log('检查是否有【去浏览】 按钮'); ui.run(() => { w.text.setText('检查是否有【去浏览】 按钮'); });
     var btn = text('去浏览').findOne(2000); //有时会有额外奖励，需要看30s广告
@@ -1346,7 +1347,7 @@ function browser_ad(){
     var count = btn?45000:25000;
     log('开始浏览广告，时长', count, 's'); ui.run(() => { w.text.setText('开始浏览广告，时长'+(count/1000)+'s'); });
     for(var i=0; i<count;){
-        //log('检查当前是否是人机验证')
+        log('检查当前是否是人机验证')
         var btn = textMatches(/.*(拖动下方滑块).*/).findOnce();
         if(btn){
             log('当前是人机验证页'); ui.run(() => { w.text.setText('当前是人机验证页，请进行人机验证'); });
@@ -1357,6 +1358,12 @@ function browser_ad(){
             }
             log('人机验证完成'); ui.run(() => { w.text.setText('人机验证完成'); });
             sleep(2000);
+        }
+        
+        if(!guessSearchFlag){
+            log('检查是否有【搜索有福利】标志 ');
+            var btn = textMatches(/.*搜索有福利.*/).findOnce();
+            if(btn) guessSearchJump();
         }
         
         log('检查是否有【完成】标志 ');
