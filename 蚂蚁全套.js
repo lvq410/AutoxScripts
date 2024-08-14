@@ -359,15 +359,17 @@ function farm(){
     log('检查【点击领取】'); ui.run(() => { w.text.setText('检查【点击领取】'); });
     common.clickImg('农场-点击领取.jpg');
     log('检查并关闭可能的弹窗'); ui.run(() => { w.text.setText('检查并关闭可能的弹窗'); });
-    var btn = text('关闭').depth().findOne(3000);
+    var btn = text('关闭').findOne(3000);
     if(btn) common.clickIfParent(btn);
     
     common.clickImg('农场-除草-收获.jpg');
     
-    while(textMatches(/还差.*次领肥料/).findOnce()!=null){
+    while(textMatches(/(还差.*次领肥料|立即领奖)/).findOnce()!=null){
         while(textMatches(/还差.*次领肥料/).findOnce()!=null){
             common.clickImg('农场-施肥.jpg'); sleep(4000);
-            closeDialog()
+            closeDialog();
+            var btn = className('android.widget.Button').text('好的').findOnce();
+            if(btn) common.clickIfParent(btn);
         }
         var btn = text('立即领奖').findOnce();
         if(btn){
@@ -1309,7 +1311,7 @@ function taobaoFarm_intend(pattern, btnPattern){
  */
 function browser_ad(){
     log('检查是否已打开广告页');
-    var btn = textMatches(/.*(浏览得肥料|一起逛街咯|浏览或查看商品|搜索有福利|滑动浏览得|拖动下方滑块).*/).findOne(5000);
+    var btn = textMatches(/.*(浏览得肥料|一起逛街咯|浏览或查看商品|搜索有福利|猜你想搜|滑动浏览得|拖动下方滑块).*/).findOne(5000);
     if(!btn) throw new Error('超时未打开广告页');
     log('已打开广告页');
     var markText = btn.text();
@@ -1332,7 +1334,7 @@ function browser_ad(){
             log('未找到【猜你想搜】');
         }
     }
-    if('搜索有福利'==markText) guessSearchJump();
+    if('搜索有福利'==markText || '猜你想搜'==markText) guessSearchJump();
     
     log('检查是否有【去浏览】 按钮'); ui.run(() => { w.text.setText('检查是否有【去浏览】 按钮'); });
     var btn = text('去浏览').findOne(2000); //有时会有额外奖励，需要看30s广告
@@ -1361,8 +1363,8 @@ function browser_ad(){
         }
         
         if(!guessSearchFlag){
-            log('检查是否有【搜索有福利】标志 ');
-            var btn = textMatches(/.*搜索有福利.*/).findOnce();
+            log('检查是否有【搜索有福利|猜你想搜】标志 ');
+            var btn = textMatches(/.*(搜索有福利|猜你想搜).*/).findOnce();
             if(btn) guessSearchJump();
         }
         
@@ -1463,5 +1465,4 @@ function closeDialog(){
 
 //==================================================================================================测试
 function test(){
-    taobaoFarm_browser()
 }
