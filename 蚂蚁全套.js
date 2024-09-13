@@ -357,10 +357,8 @@ function farm(){
     closeDialog()
     
     log('检查【点击领取】'); ui.run(() => { w.text.setText('检查【点击领取】'); });
-    common.clickImg('农场-点击领取.jpg');
-    log('检查并关闭可能的弹窗'); ui.run(() => { w.text.setText('检查并关闭可能的弹窗'); });
-    var btn = text('关闭').findOne(3000);
-    if(btn) common.clickIfParent(btn);
+    common.clickImg('农场-点击领取.jpg'); sleep(3000);
+    closeDialog()
     
     common.clickImg('农场-除草-收获.jpg');
     
@@ -646,7 +644,7 @@ function manor(){
         
         manor_kitchen()
         
-        manor_lottery(); manor_lottery();
+        manor_lottery(); sleep(2000); manor_lottery();
         
         //向上滑动半屏
         swipe(device.width / 2, device.height/2, device.width / 2, 0, 1500);
@@ -892,7 +890,7 @@ function manor_lottery(){
     common.clickIfParent(btn);
     
     log('等待【抽抽乐】打开=检查【还剩.*次机会】');
-    var btn = textMatches(/.*还剩.*次机会.*/).findOne(5000); sleep(1000)
+    var btn = textMatches(/.*活动截止时间.*/).findOne(5000); sleep(1000)
     if(!btn) throw new Error('超时未打开【抽抽乐】');
     log('找到【抽抽乐】的【还剩.*次机会】，坐标', btn.bounds());
     
@@ -993,6 +991,7 @@ function manor_lottery(){
             log('检查抽奖结果弹窗')
             var btn = textMatches(/知道啦|去装扮/).findOne(5000);
             if (btn) {
+                sleep(1000); btn = textMatches(/知道啦|去装扮/).findOnce(); //等待弹窗完全初始化好，后再找一次，否则按钮坐标不对
                 log('找到抽奖结果弹窗的【知道啦|去装扮】，坐标', btn.bounds(), '文案', btn.text());
                 if (btn.text() == '知道啦') {
                     ui.run(() => { w.text.setText('点击抽奖后弹窗【知道啦】'); });
@@ -1185,7 +1184,10 @@ function taobaoFarm(){
     log('找到【集肥料】，坐标', taskBtn.bounds());
     
     log('点击【集肥料】'); ui.run(() => { w.text.setText('点击【集肥料】'); });
-    press(taskBtn.bounds().centerX(), taskBtn.bounds().centerY(), 1); sleep(2000)
+    press(taskBtn.bounds().centerX(), taskBtn.bounds().centerY(), 1);
+    log('检查【集肥料任务列表弹窗】是否已打开'); ui.run(() => { w.text.setText('检查【集肥料任务列表弹窗】是否已打开'); });
+    var btn = text('肥料明细').findOne(3000);
+    if(!btn) return '超时未打开【集肥料任务列表弹窗】';
     
     while(taobaoFarm_browser()){};
     
@@ -1260,7 +1262,7 @@ function taobaoFarm_browser(){
     }
     log('找到', pattern, '，坐标', btn);
     
-    var btnPattern = /.*去完成.*/
+    var btnPattern = /.*(去完成|去浏览).*/
     log('检查'+pattern+'的'+btnPattern); ui.run(() => { w.text.setText('检查'+btnPattern); });
     var region = [btn.x,btn.y,device.width,200];
     if(btn.text.match(/.*(浏览最高.*300|浏览15秒.*300).*/)) region[1] = btn.y-100;
@@ -1275,6 +1277,14 @@ function taobaoFarm_browser(){
     press(btn.x, btn.y, 1); sleep(2000)
     
     browser_ad();
+    
+    for(var i=0;i<3;i++){
+        log('检查是否回到【集肥料任务列表弹窗】'); ui.run(() => { w.text.setText('检查是否回到【集肥料任务列表弹窗】'); });
+        var btn = text('肥料明细').findOne(3000);
+        if(btn) break;
+        log('未回到【集肥料任务列表弹窗】继续后退'); ui.run(() => { w.text.setText('未回到【集肥料任务列表弹窗】继续后退'); });
+        back(); sleep(2000);
+    }
     
     return true;
 }
@@ -1311,7 +1321,7 @@ function taobaoFarm_intend(pattern, btnPattern){
  */
 function browser_ad(){
     log('检查是否已打开广告页');
-    var btn = textMatches(/.*(浏览得肥料|一起逛街咯|浏览或查看商品|搜索有福利|猜你想搜|滑动浏览得|拖动下方滑块).*/).findOne(5000);
+    var btn = textMatches(/.*(得肥料|一起逛街咯|浏览或查看商品|搜索有福利|猜你想搜|滑动浏览得|拖动下方滑块).*/).findOne(5000);
     if(!btn) throw new Error('超时未打开广告页');
     log('已打开广告页');
     var markText = btn.text();
@@ -1319,9 +1329,9 @@ function browser_ad(){
     var guessSearchFlag = false;
     function guessSearchJump(){
         log('当前是【搜索有福利】页，检查【猜你想搜】'); ui.run(() => { w.text.setText('当前是【搜索有福利】页，检查【猜你想搜】'); });
-        var btn = text('猜你想搜').findOnce();
+        var btn = textMatches(/.*猜你想搜|历史搜索.*/).findOnce();
         if (btn) {
-            log('找到【猜你想搜】，坐标', btn.bounds());
+            log('找到【猜你想搜】，坐标', btn.bounds()); sleep(2000);
             var firstSearchItem = btn.parent().findOne(className('android.widget.ListView')).findOne(className('android.widget.TextView'));
             if (firstSearchItem) {
                 log('找到【猜你想搜】的第一个搜索项，坐标', firstSearchItem.bounds(), '文案', firstSearchItem.text());
@@ -1372,9 +1382,9 @@ function browser_ad(){
         var btn = textMatches(/.*(任务完成|当前页下单|浏览完成|已完成|已发放).*/).findOnce();
         if(btn){
             log('找到【完成】标志：', btn.text()); ui.run(() => { w.text.setText('找到【完成】标志：'+btn.text()); });
-            var btn = textMatches(/.*(得肥料\(1\/2\)).*/).findOnce();
+            var btn = textMatches(/.*(得肥料\(1\/2\)|浏览得肥料).*/).findOnce();
             if (btn) {
-                log('有【完成】标志，但仍有【得肥料(1/2)】', btn.bounds());
+                log('有【完成】标志，但仍有【得肥料(1/2)|浏览得肥料】', btn.bounds());
             }else{
                 log('结束广告浏览'); ui.run(() => { w.text.setText('结束广告浏览'); });
                 break;
@@ -1459,10 +1469,12 @@ function anti_antiBot(){
 }
 
 function closeDialog(){
-    var btn = className('android.app.Dialog').find().findOne(className('android.widget.Button').clickable().text('关闭'));
+    //var btn = className('android.app.Dialog').find().findOne(className('android.widget.Button').clickable().text('关闭'));
+    var btn = text('关闭').findOnce();
     if(btn) common.clickIfParent(btn);
 }
 
 //==================================================================================================测试
 function test(){
+    browser_ad()
 }
