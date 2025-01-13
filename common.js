@@ -1,4 +1,3 @@
-
 /**
  * 是否启用common模块里的日志输出
  */
@@ -512,3 +511,76 @@ var debug_showPoint = module.exports.debug_showPoint = function(point) {
 var randomNumber = module.exports.randomNumber = function(min, max) {
     return Math.floor(Math.random() * (max - min + 1) + min);
 }
+
+var WsServer,WsOkHttpClient,WsListener = {
+    onOpen: function (webSocket, response) {
+        log("websocket 连接服务端成功");
+        WebSocket = webSocket;
+    },
+    onMessage: function (webSocket, msg) { //msg为待执行脚本
+        log("websocket 收到消息", msg);
+        try {
+            var rst = eval(msg);
+            log('脚本执行return', rst);
+            WebSocket.send('脚本执行return：'+rst);
+        } catch (e) {
+            log('脚本执行异常', e);
+            WebSocket.send('脚本执行异常' + e);
+        }
+    },
+    onClosing: function (webSocket, code, reason) {
+        WebSocket = null;
+        log("websocket 关闭中", code, reason);
+    },
+    onClosed: function (webSocket, code, response) {
+        WebSocket = null;
+        log("websocket 关闭", code);
+    },
+    onFailure: function (webSocket, t, response) {
+        log("websocket 异常，5秒后重试连接", t);
+        WebSocket = null;
+        setTimeout(websocket_init, 5000); //n秒后重连
+    }
+};
+function websocket_init(){
+    log("websocket 开始连接服务端", WsServer);
+    var request = new Request.Builder().url(WsServer).build();
+    WsOkHttpClient.newWebSocket(request, new WebSocketListener(WsListener)); //创建链接
+}
+
+/**
+ * 建立与调试服务器的websocket连接
+ * @param websocketServer websocket服务器地址，如ws://192.168.0.1:8080
+ */
+var ws_debug = module.exports.ws_debug = function(websocketServer) {
+    importPackage(Packages["okhttp3"]); //导入包
+    
+    WsServer = websocketServer;
+    
+    if(!WsOkHttpClient){
+        WsOkHttpClient = new OkHttpClient.Builder().retryOnConnectionFailure(true).build();
+        WsOkHttpClient.dispatcher().cancelAll();//清理一次
+    }
+    
+    websocket_init();
+}
+
+/**
+ * 打印日志，如果已经建立了websocket连接则发送日志到调试服务器
+ */
+module.exports.log = function() {
+    var msg = '';
+    for (var i = 0; i < arguments.length; i++) {
+        var arg = arguments[i];
+        if (typeof arg == 'object') arg = JSON.stringify(arg);
+        if (i > 0) msg += ', ';
+        msg += arg;
+    }
+    log(msg)
+    if(!WebSocket) return;
+    try {
+        WebSocket.send(msg);
+    }catch(e){
+        log('websocket发送消息异常', msg, e);
+    }
+};

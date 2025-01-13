@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: autojs-debugger
+  main:
+    banner-mode: "OFF"
+
+logging:
+  level:
+    root: info
+    org.springframework.boot.web.embedded.tomcat.TomcatWebServer: debug
+    org.springframework.test.web.servlet.result: debug
