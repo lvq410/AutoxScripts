@@ -277,20 +277,22 @@ var MainW = floaty.window(
 MainW.setAdjustEnabled(false)
 MainW.setSize(-2, -2)
 MainW.exitOnClose()
-MainW.setPosition(MainPoint.x, MainPoint.y)
-refreshMainBtnTxt()
 
-MainW.armour.attr('bg', ChangeableEquip.armour?'#00ff00':'#000000');
+ui.run(()=>{
+    MainW.setPosition(MainPoint.x, MainPoint.y)
+    MainW.armour.attr('bg', ChangeableEquip.armour?'#00ff00':'#000000');
+    MainW.wand.attr('bg', ChangeableEquip.wand?'#00ff00':'#000000');
+    MainW.hand.attr('bg', ChangeableEquip.hand?'#00ff00':'#000000');
+    MainW.blade.attr('bg', ChangeableEquip.blade?'#00ff00':'#000000');
+    MainW.wing.attr('bg', ChangeableEquip.wing?'#00ff00':'#000000');
+    MainW.fire.attr('bg', ChangeableEquip.fire?'#00ff00':'#000000');
+});
+refreshMainBtnTxt()
 MainW.armour.on('click', function(){ toggleChangeable('armour'); });
-MainW.wand.attr('bg', ChangeableEquip.wand?'#00ff00':'#000000');
 MainW.wand.on('click', function() { toggleChangeable('wand'); });
-MainW.hand.attr('bg', ChangeableEquip.hand?'#00ff00':'#000000');
 MainW.hand.on('click', function() { toggleChangeable('hand'); });
-MainW.blade.attr('bg', ChangeableEquip.blade?'#00ff00':'#000000');
 MainW.blade.on('click', function() { toggleChangeable('blade'); });
-MainW.wing.attr('bg', ChangeableEquip.wing?'#00ff00':'#000000');
 MainW.wing.on('click', function() { toggleChangeable('wing'); });
-MainW.fire.attr('bg', ChangeableEquip.fire?'#00ff00':'#000000');
 MainW.fire.on('click', function() { toggleChangeable('fire'); });
 function toggleChangeable(equip) {
     function removeEquipFromQueue(equip){
@@ -329,7 +331,6 @@ function toggleChangeable(equip) {
             break;
     }
     storage.put("ChangeableEquip", ChangeableEquip)
-    
     
     refreshMainBtnTxt();
 }

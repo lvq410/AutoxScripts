@@ -195,7 +195,7 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
         }
         if (LogEnable) log('等待图片出现', imgNames);
         var imgMeta; var imgPoint; //找到的图片及其位置
-        var waited = 0; //已等待时间
+        var waitBeginTime = new Date().getTime();
         var clickPoint; //点击位置
         while (true) {
             var screen = captureScreenx();
@@ -232,10 +232,9 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
                 break;
             }
             if (waitDisplayTimeout == 0) break;
-            if (LogEnable) log('未出现')
-            waited += gap;
+            if (LogEnable) log('未出现');
+            if(new Date().getTime() - waitBeginTime >= waitDisplayTimeout) break;
             sleep(gap);
-            if (waited >= waitDisplayTimeout) break;
         }
 
         if (!clickPoint) {
@@ -250,7 +249,7 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
 
         if (waitDisappearTimeout == 0) return clickPoint;
 
-        if (LogEnable) log('等待图片消失'); waited = 0;
+        if (LogEnable) log('等待图片消失'); var waitBeginTime = new Date().getTime();
         while (true) {
             var screen = captureScreenx();
             if (options.imgThreshold != null) {
@@ -262,10 +261,9 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
                 if (LogEnable) log('图片消失');
                 return clickPoint;
             }
-            if (LogEnable) log('未消失')
-            waited += gap;
+            if (LogEnable) log('未消失');
+            if(new Date().getTime() - waitBeginTime >= waitDisappearTimeout) break;
             sleep(gap);
-            if (waited >= waitDisappearTimeout) break;
             if (loopClickWhileWaitDisappear) press(clickPoint.x, clickPoint.y, clickDuration);
         }
 
@@ -495,9 +493,8 @@ var clickOcr = module.exports.clickOcr = function(textPattern, options) {
 
     var clickPoint;
     if (LogEnable) log('等待文字出现', textPattern);
-    var textPoint; var waited = 0;
+    var textPoint; var waitBeginTime = new Date().getTime();
     while (true) {
-        var screen = captureScreenx();
         var textPoint = ocrFind(textPattern)
         if (textPoint) {
             if (LogEnable) log('文字出现', textPoint);
@@ -523,9 +520,8 @@ var clickOcr = module.exports.clickOcr = function(textPattern, options) {
         }
         if (waitDisplayTimeout == 0) break;
         if (LogEnable) log('未出现')
-        waited += gap;
+        if(new Date().getTime() - waitBeginTime >= waitDisplayTimeout) break;
         sleep(gap);
-        if (waited >= waitDisplayTimeout) break;
     }
 
     if (!clickPoint) {
@@ -540,18 +536,16 @@ var clickOcr = module.exports.clickOcr = function(textPattern, options) {
     
     if (waitDisappearTimeout == 0) return clickPoint;
     
-    if (LogEnable) log('等待文字消失'); waited = 0;
+    if (LogEnable) log('等待文字消失'); var waitBeginTime = new Date().getTime();
     while (true) {
-        var screen = captureScreenx();
         var textPoint = ocrFind(textPattern)
         if (!textPoint) {
             if (LogEnable) log('文字消失');
             return clickPoint;
         }
-        if (LogEnable) log('未消失')
-        waited += gap;
+        if (LogEnable) log('未消失');
+        if(new Date().getTime() - waitBeginTime >= waitDisappearTimeout) break;
         sleep(gap);
-        if (waited >= waitDisappearTimeout) break;
         if (loopClickWhileWaitDisappear) press(clickPoint.x, clickPoint.y, clickDuration);
     }
     

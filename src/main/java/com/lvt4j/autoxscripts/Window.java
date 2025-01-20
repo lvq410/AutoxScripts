@@ -5,6 +5,7 @@ import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridLayout;
 import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
@@ -14,6 +15,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.BoxLayout;
 import javax.swing.DefaultComboBoxModel;
@@ -26,6 +28,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.Timer;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
@@ -71,18 +74,9 @@ public class Window{
     
     public static void init(){
         main_frame = new JFrame("AutoXScripts");
-        main_frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        main_frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         main_frame.setSize(1200, 500);
-        main_frame.addWindowListener(new WindowAdapter() {
-            @SneakyThrows
-            public void windowClosing(WindowEvent e) {
-                String serverHost = (String)serverHost_comboBox.getSelectedItem();
-                String serverPort = (String)serverPort_comboBox.getSelectedItem();
-                Config.server(serverHost, serverPort, false);
-                Thread.sleep(1000);
-                AutoJsDebuggerApp.stopWebSocketServer();
-            }
-        });
+        main_frame.addWindowListener(on_window_close);
         
         main_panel = new JPanel();
         main_panel.setLayout(new BoxLayout(main_panel, BoxLayout.Y_AXIS));
@@ -104,6 +98,22 @@ public class Window{
         main_frame.setLocation(x, y); // 设置窗口位置
         main_frame.setVisible(true);
     }
+    
+    private static WindowAdapter on_window_close = new WindowAdapter() {
+        @SneakyThrows
+        public void windowClosing(WindowEvent e) {
+            console("开始关闭。。。");
+            String serverHost = (String)serverHost_comboBox.getSelectedItem();
+            String serverPort = (String)serverPort_comboBox.getSelectedItem();
+            Config.server(serverHost, serverPort, false);
+            new Timer(1000, new ActionListener(){
+                public void actionPerformed(ActionEvent e){
+                    AutoJsDebuggerApp.stopWebSocketServer();
+                    System.exit(0);
+                }
+            }).start();
+        }
+    };
     
     private static void init_ftp_sync_panel(){
         ftp_sync_panel = new JPanel();
@@ -165,22 +175,19 @@ public class Window{
             return;
         }
         ftp_sync_btn_confirm.setEnabled(false);
+        start_all_btn.setEnabled(false);
         
         console("开始启动FTP同步...");
-        new Thread(()->{
-            try{
-                FtpSyncer.init(mobileHostPort, mobileFolder, ()->{
-                    Config.ftp_sync_mobile(mobileHost, mobilePort, mobileFolder);
-                    server_enable_checkBox.setEnabled(true);
-                    start_all_btn.setEnabled(false);
-                });
-            }catch(Exception ig){
-                console("启动FTP同步失败"); console(ig);
-                JOptionPane.showMessageDialog(main_frame, "启动FTP同步失败", "错误", JOptionPane.ERROR_MESSAGE);
-                ftp_sync_btn_confirm.setEnabled(true);
-                return;
-            }
-        }).start();
+        FtpSyncer.init(mobileHostPort, mobileFolder, ()->{
+            Config.ftp_sync_mobile(mobileHost, mobilePort, mobileFolder);
+            server_enable_checkBox.setEnabled(true);
+            start_all_btn.setEnabled(false);
+        }, ex->{
+            console("启动FTP同步失败"); console(ex);
+            JOptionPane.showMessageDialog(main_frame, "启动FTP同步失败", "错误", JOptionPane.ERROR_MESSAGE);
+            ftp_sync_btn_confirm.setEnabled(true);
+            start_all_btn.setEnabled(true);
+        });
     };
 
     private static void init_server_panel() {
@@ -216,12 +223,7 @@ public class Window{
         
         start_all_btn = new JButton("一键启动");
         start_all_btn.setMaximumSize(new Dimension(80, start_all_btn.getPreferredSize().height)); // 设置按钮的最大尺寸为固定宽度
-        start_all_btn.addActionListener(e->{
-            ftp_sync_btn_confirm.doClick();
-            server_enable_checkBox.setSelected(true);
-            server_start_btn.doClick();
-            start_all_btn.setEnabled(false);
-        });
+        start_all_btn.addActionListener(on_start_all_btn_click);
         server_panel.add(start_all_btn);
     }
     
@@ -264,20 +266,27 @@ public class Window{
         server_start_btn.setEnabled(false);
 
         console("开始启动WebSocket服务器...");
+        AutoJsDebuggerApp.startWebSocketServer(serverHost, Integer.valueOf(serverPort), ()->{
+            console("WebSocket服务器启动成功");
+            Config.server(serverHost, serverPort, true);
+        }, ex->{
+            console("WebSocket服务器启动失败"); console(ex);
+            JOptionPane.showMessageDialog(main_frame, "启动服务器失败", "错误", JOptionPane.ERROR_MESSAGE);
+            server_start_btn.setEnabled(true);
+        });
+    };
+    
+    private static ActionListener on_start_all_btn_click = e->{
         new Thread(()->{
-            try{
-                AutoJsDebuggerApp.startWebSocketServer(serverHost, Integer.valueOf(serverPort), ()->{
-                    console("WebSocket服务器启动成功");
-                    Config.server(serverHost, serverPort, true);
-                });
-            }catch(Exception ig){
-                console("WebSocket服务器启动失败");
-                console(ig);
-                JOptionPane.showMessageDialog(main_frame, "启动服务器失败", "错误", JOptionPane.ERROR_MESSAGE);
-                server_start_btn.setEnabled(true);
-                return;
-            }
-        }).start();
+            try {
+                ftp_sync_btn_confirm.doClick();
+                if(!FtpSyncer.RunningLatch.await(5, TimeUnit.SECONDS)) return;
+                server_enable_checkBox.setSelected(true);
+                server_start_btn.doClick();
+                if(!AutoJsDebuggerApp.RunningLatch.await(5, TimeUnit.SECONDS)) return;
+                start_all_btn.setEnabled(false);
+            }catch (Exception ig) {}
+        },"StartAll").start();
     };
     
     private static void init_console(){

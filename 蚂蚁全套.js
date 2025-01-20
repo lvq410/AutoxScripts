@@ -1,7 +1,8 @@
 auto.waitFor();
 
 //==================================================================================================常量配置
-var MediaDir = '/storage/emulated/0/Autox/AntForest/';
+var MediaDir = engines.myEngine().cwd()+'/AntForest/'
+
 var LogEnable = false;
 
 
@@ -670,6 +671,7 @@ function manor(){
                 did |= manor_simple(/.*去芭芭农场逛一逛.*/, '去完成');
                 did |= manor_simple(/.*浏览.*专场.*得.*饲料.*/, '去完成');
                 did |= manor_simple(/.*参与活动.*得.*饲料.*/, '去完成');
+                did |= manor_simple(/.*去芝麻集福卡逛一逛.*/, '去完成');
                 
                 did |= manor_intent(/去逛一逛淘金币小镇/, '去完成');
                 did |= manor_intent(/去逛一逛淘宝视频/, '去完成');
@@ -1650,13 +1652,13 @@ function manor_play_ad(){
         
         log('查找【浏览广告】'); ui.run(() => { w.text.setText('查找【浏览广告】'); });
         var adPattern = /.*(浏览广告.*秒后可领奖励|.*秒可领奖励).*/;
-        var btn = common.clickOcr(adPattern, {doClick:false,threshold:0.8,waitDisplayTimeout:3000});
+        var btn = common.clickOcr(adPattern, {doClick:false,threshold:0.8,waitDisplayTimeout:3000,gap:1000});
         if(!btn){
             log('未找到【浏览广告】'); ui.run(() => { w.text.setText('未找到【浏览广告】'); });
             log('检查是否是分享给好友'); ui.run(() => { w.text.setText('检查是否是分享给好友'); });
             var btn = text('支付宝好友').findOnce();
             if(btn){
-                common.clickIfParent(btn);
+                common.clickIfParent(btn); sleep(1000)
                 log('查找【8066】'); ui.run(() => { w.text.setText('查找【8066】'); });
                 var btn = text('8066').findOne(2000); //指定好友分享
                 if(!btn){
@@ -1664,7 +1666,7 @@ function manor_play_ad(){
                     throw new Error('未找到好友【8066】');
                 }
                 log('找到【8066】，坐标', btn); ui.run(() => { w.text.setText('找到【8066】'); });
-                common.clickIfParent(btn);
+                common.clickIfParent(btn); sleep(1000)
                 log('查找【发送】'); ui.run(() => { w.text.setText('查找【发送】'); });
                 var btn = text('发送').findOne(2000);
                 if (!btn) {

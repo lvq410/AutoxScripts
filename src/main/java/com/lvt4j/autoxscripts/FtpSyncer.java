@@ -12,6 +12,8 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.function.Consumer;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
@@ -27,13 +29,43 @@ import lombok.Cleanup;
  *
  * @author chanceylee on 2024年6月3日
  */
-public class FtpSyncer{
+public class FtpSyncer {
 
     private static final String FtpUser = "anonymous";
     private static final String FtpPassword = "";
     
-    public static void init(HostAndPort ftpServer, String ftpWorkPath, Runnable postStart) throws Exception{
-        @Cleanup("disconnect") FTPClient ftpClient = new FTPClient();
+    public static final CountDownLatch RunningLatch = new CountDownLatch(1);
+    
+    private static FTPClient ftpClient;
+    private static WatchService watchService;
+    private static String LocalWorkPath;
+    private static Path localFolder;
+    private static Map<WatchKey, Path> watchedKeys;
+    
+    public static void init(HostAndPort ftpServer, String ftpWorkPath, Runnable postStart, Consumer<Exception> postException) {
+        new Thread(()->{
+            try{
+                init_ftp(ftpServer, ftpWorkPath);
+            }catch(Exception e){
+                if(postException!=null) postException.accept(e);
+                return;
+            }
+            
+            RunningLatch.countDown();
+            System.out.println("开始同步["+LocalWorkPath+"] > ftp["+ftpWorkPath+"]");
+            Window.console("开始同步["+LocalWorkPath+"] > ftp["+ftpWorkPath+"]");
+            if(postStart!=null) postStart.run();
+            
+            try{
+                watch();
+            }catch(Exception e){
+                Window.console("ftp同步异常："); Window.console(e);
+            }
+        }, "FtpSyncer").start();
+    }
+    
+    private static void init_ftp(HostAndPort ftpServer, String ftpWorkPath) throws Exception {
+        ftpClient = new FTPClient();
         ftpClient.setControlEncoding("UTF-8");
         ftpClient.setCharset(Charset.forName("UTF-8"));
         ftpClient.connect(ftpServer.getHost(), ftpServer.getPort());
@@ -41,11 +73,12 @@ public class FtpSyncer{
         ftpClient.enterLocalPassiveMode();
         ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
         ftpClient.changeWorkingDirectory(ftpWorkPath);
-
-        String LocalWorkPath = new File("").getAbsolutePath();
-        Path localFolder = Paths.get(LocalWorkPath);
-        Map<WatchKey, Path> watchedKeys = new HashMap<>();
-        WatchService watchService = java.nio.file.FileSystems.getDefault().newWatchService();
+        
+        watchService = java.nio.file.FileSystems.getDefault().newWatchService();
+        LocalWorkPath = new File("").getAbsolutePath();
+        localFolder = Paths.get(LocalWorkPath);
+        watchedKeys = new HashMap<>();
+        
         Files.walk(localFolder).filter(Files::isDirectory).forEach(dir -> {
             try {
                 WatchKey key = dir.register(watchService, StandardWatchEventKinds.ENTRY_CREATE,
@@ -55,12 +88,9 @@ public class FtpSyncer{
                 throw new RuntimeException("注册监视目录["+dir+"]失败", e);
             }
         });
-        
-        postStart.run();
-        
-        System.out.println("开始同步["+LocalWorkPath+"] > ftp["+ftpWorkPath+"]");
-        Window.console("开始同步["+LocalWorkPath+"] > ftp["+ftpWorkPath+"]");
-        
+    }
+    
+    private static void watch() throws Exception{
         while(true){
             WatchKey key = watchService.take();
             
