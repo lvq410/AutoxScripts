@@ -75,17 +75,16 @@ public class FtpSyncer{
                 path = localFolder.relativize(path);
                 String pathStr = FilenameUtils.normalize(path.toString(), true);
                 String ext = FilenameUtils.getExtension(pathStr);
-                if(!"js".equalsIgnoreCase(ext)) continue;
+                if(!"js".equalsIgnoreCase(ext) && !"json".equalsIgnoreCase(ext)) continue;
                 
                 File file = new File(LocalWorkPath + "/" + pathStr);
                 @Cleanup FileInputStream fis = new FileInputStream(file);
                 boolean rst = ftpClient.storeFile(pathStr, fis);
-                System.out.println("上传文件["+pathStr+"] : "+rst+" "+DateFormatUtils.format(file.lastModified(), "yyyy-MM-dd HH:mm:ss"));
-                Window.console("上传文件["+pathStr+"] : "+rst+" "+DateFormatUtils.format(file.lastModified(), "yyyy-MM-dd HH:mm:ss"));
+                System.out.println("上传文件["+pathStr+"] : 结果："+rst+" 修改时间："+DateFormatUtils.format(file.lastModified(), "HH:mm:ss"));
+                Window.console("上传文件["+pathStr+"] : 结果："+rst+" 修改时间："+DateFormatUtils.format(file.lastModified(), "HH:mm:ss"));
             }
             key.reset();
         }
-        
     }
     
 }

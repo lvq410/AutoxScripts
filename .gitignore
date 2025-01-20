@@ -25,3 +25,5 @@ applicationPid
 /logs/
 *.log
 NOA打卡.js
+/debugger.conf
+/debug_server_conf.json

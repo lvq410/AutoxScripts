@@ -10,8 +10,10 @@ import java.util.Enumeration;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import lombok.SneakyThrows;
 
@@ -26,8 +28,13 @@ public class Config{
     private static final String[] Default_serverPortOptions = {"8080"};
     
     private static final String ConfigFileName = "debugger.conf";
+
+    /**
+     * 手机端用的配置文件名
+     */
+    private static final String MobileConfigFileName = "debug_server_conf.json";
     
-    private static ObjectMapper mapper = new ObjectMapper();
+    public static ObjectMapper mapper = new ObjectMapper();
     
     private static Config instance;
     
@@ -44,6 +51,7 @@ public class Config{
             instance.ftp_sync_mobilePortOptions = Default_ftp_sync_mobilePortOptions;
             instance.ftp_sync_mobileFolderOptions = Default_ftp_sync_mobileFolderOptions;
             instance.serverPortOptions = Default_serverPortOptions;
+            instance.commandHistories = new java.util.HashMap<>();
             mapper.writeValue(configFile, instance);
         }
         instance = mapper.readValue(configFile, Config.class);
@@ -94,7 +102,7 @@ public class Config{
     }
     
     @SneakyThrows
-    public static void server(String serverHost, String serverPort){
+    public static void server(String serverHost, String serverPort, boolean enable){
         // 保存选项，最多保存MaxSaveOptionsNum个选项，最近选项在最前
         List<String> hostOptions = new ArrayList<>(Arrays.asList(instance.serverHostOptions));
         hostOptions.remove(serverHost);
@@ -109,8 +117,24 @@ public class Config{
         instance.serverPortOptions = portOptions.toArray(new String[portOptions.size()]);
 
         mapper.writeValue(new File(ConfigFileName), instance);
+        
+        ObjectNode mobileConf = mapper.createObjectNode();
+        mobileConf.put("enable", enable);
+        mobileConf.put("server", "ws://"+serverHost+":"+serverPort);
+        mapper.writeValue(new File(MobileConfigFileName), mobileConf);
     }
     
+    public static List<String> commandHistories(String scriptFileName){
+        if(instance.commandHistories==null) instance.commandHistories = new java.util.HashMap<>();
+        return instance.commandHistories.getOrDefault(scriptFileName, new LinkedList<>());
+    }
+    
+    @SneakyThrows
+    public static void commandHistories(String scriptFileName, List<String> commandHistories){
+        if(instance.commandHistories==null) instance.commandHistories = new java.util.HashMap<>();
+        instance.commandHistories.put(scriptFileName, commandHistories);
+        mapper.writeValue(new File(ConfigFileName), instance);
+    }
     
     public String[] ftp_sync_mobileHostOptions;
     public String[] ftp_sync_mobilePortOptions;
@@ -118,6 +142,8 @@ public class Config{
     
     public String[] serverHostOptions;
     public String[] serverPortOptions;
+    
+    public Map<String, List<String>> commandHistories;
     
     @SneakyThrows
     private static List<String> localIps() {

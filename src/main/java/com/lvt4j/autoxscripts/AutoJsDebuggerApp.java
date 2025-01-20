@@ -23,6 +23,7 @@ public class AutoJsDebuggerApp{
     }
 
     public static void stopWebSocketServer(){
+        if(context==null) return;
         SpringApplication.exit(context);
     }
     

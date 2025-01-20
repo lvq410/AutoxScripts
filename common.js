@@ -1,3 +1,80 @@
+
+/** 飞浆ocr识别时的最小宽高，低于这个宽高会导致内存泄漏，进而脚本崩溃 */
+module.exports.PaddleOcrMin = {w:360, h:260}
+
+var WsServer,WsOkHttpClient,WebSocket,WsListener = {
+    onOpen: function (webSocket, response) {
+        log("websocket 连接服务端成功");
+        WebSocket = webSocket;
+    },
+    onMessage: function (webSocket, msg) { //msg为待执行脚本
+        if(msg == 'heartbeat') return;
+        log("websocket 收到消息", msg);
+        threads.start(function(){
+            try {
+                var rst = eval(msg);
+                log('脚本执行return', rst);
+                if(WebSocket!=null) WebSocket.send('脚本执行return：'+JSON.stringify(rst));
+            } catch (e) {
+                log('脚本执行异常', e);
+                if(WebSocket!=null) WebSocket.send('脚本执行异常' + e);
+            }
+        });
+    },
+    onClosing: function (webSocket, code, reason) {
+        log("websocket 关闭中", code, reason);
+        WebSocket.close(1000, '主动关闭');
+        WebSocket = null;
+    },
+    onClosed: function (webSocket, code, response) {
+        WebSocket = null;
+        log("websocket 关闭", code);
+        setTimeout(websocket_init, 5000); //n秒后重连
+    },
+    onFailure: function (webSocket, t, response) {
+        log("websocket 异常，5秒后重试连接", t);
+        WebSocket = null;
+        setTimeout(websocket_init, 5000); //n秒后重连
+    }
+};
+function websocket_init(){
+    log("websocket 开始连接服务端", WsServer);
+    var request = new Request.Builder().url(WsServer).build();
+    WsOkHttpClient.newWebSocket(request, new WebSocketListener(WsListener)); //创建链接
+}
+
+/**
+ * 判断是否启动 与调试服务器的websocket连接
+ */
+var wsDebugConfFile = files.cwd() + '/debug_server_conf.json';
+if(files.exists(wsDebugConfFile)){
+    var wsDebugConf = JSON.parse(files.read(wsDebugConfFile));
+    if(wsDebugConf.enable) { //建立与调试服务器的websocket连接
+        log("启动websocket调试服务："+wsDebugConf.server);
+        
+        importPackage(Packages["okhttp3"]); //导入包
+        
+        var engineId = engines.myEngine().getId();
+        var scriptFileName = files.getName(engines.myEngine().getSource().toString());
+        var id = engineId + '-' + scriptFileName;
+        WsServer = wsDebugConf.server+'?id='+encodeURIComponent(id);
+        
+        if(!WsOkHttpClient){
+            WsOkHttpClient = new OkHttpClient.Builder().retryOnConnectionFailure(true).build();
+            WsOkHttpClient.dispatcher().cancelAll();//清理一次
+        }
+        
+        websocket_init();
+        
+        setInterval(()=>{
+            if(WebSocket==null) return;
+            try{
+                WebSocket.send('heartbeat');
+            }catch(ig){}
+        }, 1000);
+    }
+}
+
 /**
  * 是否启用common模块里的日志输出
  */
@@ -9,7 +86,7 @@ module.exports.setLogEnable = function(enable) {
 /**
  * common脚本所用媒体资源的目录
  */
-var MediaDir = "/storage/emulated/0/脚本/";
+var MediaDir = files.cwd()+"/";
 module.exports.setMediaDir = function(dir) {
     MediaDir = dir;
     if (MediaDir.charAt(MediaDir.length - 1) != '/') MediaDir += '/';
@@ -40,7 +117,12 @@ var timestampFormat = module.exports.timestampFormat = function(time) {
 
 /**
  * 点击图片
- * @param imgNames 图片文件名，在MediaDir下找。可以是单个字符串，也可以是多个字符串构成的数组。数组时会依次查找，任意一个找到即算
+ * @param imgNames 图片文件名，在MediaDir下找。<pre>
+ * ●可以是单个字符串，如 'a.jpg'
+ * ●也可以是多个字符串构成的数组，如 ['b.jpeg', 'c.png']
+ * ●也可以是正则表达式，如 /^abc.*.jpg$/<br>
+ * 代表多个值时时会依次查找，任意一个找到即算
+ * </pre>
  * @param options<pre>
  * 　{
  * 　　offset:{x:null,y:null},//点击位置相对于图片坐标的偏移。默认null表示图片正中心。{x:0,y:0}格式：x正数表示从最左向右便宜，负数表示从最右向左偏移；y同理
@@ -56,7 +138,14 @@ var timestampFormat = module.exports.timestampFormat = function(time) {
  * 　　threshold:0.9 //相似度阈值，0~1之间。默认0.9
  * 　}
  * </pre>
- * @return 点击坐标{x,y}。图片未出现返回null。等待图片消失超时时返回的对象中会多一个字段stillExists=true表示超时时图片仍然存在
+ * @return <pre>图片未出现返回null。出现则返回
+ * 　{
+ * 　　imgName: 'a.jpg', //出现的图片文件名，当imgNames为数组或正则时，有助于识别出现的是哪张图片
+ * 　　x: 123, //点击坐标
+ * 　　y: 456 //点击坐标
+ * 　　//,stillExists: true //等待图片消失超时时返回的对象中会多出该字段，表示超时时图片仍然存在
+ * 　}
+ * </pre>
  **/
 var clickImg = module.exports.clickImg = function(imgNames, options) {
     options = options || {};
@@ -73,23 +162,39 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
     var offset = options.offset || {};
 
     if(typeof imgNames == 'string') imgNames = [imgNames];
-    var imgs = imgNames.map(n=>{
+    if(imgNames instanceof RegExp) {
+        var filtered = files.listDir(MediaDir , function(name){
+            if(!imgNames.test(name)) return false;
+            var isFile = files.isFile(files.join(MediaDir, name));
+            if(!isFile) return false;
+            var ext = (files.getExtension(name)||'').toLowerCase();
+            var isImg = ext == 'jpg' || ext == 'jpeg' || ext == 'png';
+            if(!isImg) return false;
+            return true;
+        });
+        imgNames = filtered;
+    }
+    var imgMetas = imgNames.map(n=>{
         var img = images.read(MediaDir + n);
-        if (!img && LogEnable) log('图片文件不存在', n);
-        return img;
+        if (!img && LogEnable){
+            log('图片文件不存在', n);
+            return null;
+        }
+        return {
+            img: img,
+            name: n
+        };
     }).filter(i=>i);
     try {
         if (options.imgThreshold != null) {
-            var thresholdImgs = [];
-            imgs.forEach(img => {
-                var thresholdImg = images.threshold(img, options.imgThreshold, 255);
-                img.recycle();
-                thresholdImgs.push(thresholdImg);
+            imgMetas.forEach(imgMeta => {
+                var thresholdImg = images.threshold(imgMeta.img, options.imgThreshold, 255);
+                imgMeta.img.recycle();
+                imgMeta.img = thresholdImg;
             });
-            imgs = thresholdImgs;
         }
         if (LogEnable) log('等待图片出现', imgNames);
-        var img; var imgPoint; //找到的图片及其位置
+        var imgMeta; var imgPoint; //找到的图片及其位置
         var waited = 0; //已等待时间
         var clickPoint; //点击位置
         while (true) {
@@ -98,28 +203,30 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
                 screen = images.threshold(screen, options.imgThreshold, 255);
                 CaptureScreenxs.push(screen);
             }
-            for(var i=0;i<imgs.length; i++){
-                img = imgs[i];
-                imgPoint = images.findImage(screen, img, { region: region, threshold: threshold });
+            for(var i=0;i<imgMetas.length; i++){
+                imgMeta = imgMetas[i];
+                imgPoint = images.findImage(screen, imgMeta.img, { region: region, threshold: threshold });
                 if(imgPoint) break;
             }
             if (imgPoint) {
                 if (LogEnable) log('图片出现', imgPoint);
-                clickPoint = {}
+                clickPoint = {
+                    imgName: imgMeta.name,
+                }
                 if (offset.x == null) {
-                    clickPoint.x = imgPoint.x + img.getWidth() / 2;
+                    clickPoint.x = imgPoint.x + imgMeta.img.getWidth() / 2;
                 } else if (offset.x >= 0) {
                     clickPoint.x = imgPoint.x + offset.x;
                 } else {
-                    clickPoint.x = imgPoint.x + img.getWidth() + offset.x;
+                    clickPoint.x = imgPoint.x + imgMeta.img.getWidth() + offset.x;
                 }
                 clickPoint.x = parseInt(clickPoint.x)
                 if (offset.y == null) {
-                    clickPoint.y = imgPoint.y + img.getHeight() / 2;
+                    clickPoint.y = imgPoint.y + imgMeta.img.getHeight() / 2;
                 } else if (offset.y >= 0) {
                     clickPoint.y = imgPoint.y + offset.y;
                 } else {
-                    clickPoint.y = imgPoint.y + img.getHeight() + offset.y;
+                    clickPoint.y = imgPoint.y + imgMeta.img.getHeight() + offset.y;
                 }
                 clickPoint.y = parseInt(clickPoint.y)
                 break;
@@ -150,11 +257,7 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
                 screen = images.threshold(screen, options.imgThreshold, 255);
                 CaptureScreenxs.push(screen);
             }
-            for(var i=0;i<imgs.length; i++){
-                img = imgs[i];
-                imgPoint = images.findImage(screen, img, { region: region, threshold: threshold });
-                if(imgPoint) break;
-            }
+            imgPoint = images.findImage(screen, imgMeta.img, { region: region, threshold: threshold });
             if (!imgPoint) {
                 if (LogEnable) log('图片消失');
                 return clickPoint;
@@ -171,7 +274,7 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
         clickPoint.stillExists = true;
         return clickPoint;
     } finally {
-        imgs.forEach(i=>i.recycle());
+        imgMetas.forEach(m=>m.img.recycle());
     }
 }
 
@@ -272,6 +375,30 @@ var floatyMoveHandler = module.exports.floatyMoveHandler = function(window, move
                 var y = windowY + (event.getRawY() - origY);
                 window.setPosition(x, y);
                 if (moveCallback) moveCallback(x, y, window);
+                return true;
+        }
+        return true;
+    });
+}
+
+var floatyResizeHandler = module.exports.floatyResizeHandler = function(window, resizeHandler, resizeCallback) {
+    var origX = 0, origY = 0; //记录按键被按下时的触摸坐标
+    var windowOrigWidth, windowOrigHeight; //记录按键被按下时的悬浮窗宽高
+    var handlerWidth, handlerHeight; //记录按键被按下时的触摸控件宽高
+    resizeHandler.setOnTouchListener(function(view, event) {
+        switch (event.getAction()) {
+            case event.ACTION_DOWN:
+                origX = event.getRawX(); origY = event.getRawY();
+                windowOrigWidth = window.getWidth(); windowOrigHeight = window.getHeight();
+                //common.log('windowOrigWidth', windowOrigWidth, 'windowOrigHeight', windowOrigHeight);
+                return true;
+            case event.ACTION_MOVE: //移动手指时调整悬浮窗位置
+                var widthDelta = event.getRawX() - origX;
+                var heightDelta = event.getRawY() - origY;
+                var width = windowOrigWidth + widthDelta; if(width<1) width=1;
+                var height = windowOrigHeight + heightDelta; if(height<1) height=1;
+                window.setSize(width, height);
+                if (resizeCallback) resizeCallback(width, height, window);
                 return true;
         }
         return true;
@@ -510,59 +637,6 @@ var debug_showPoint = module.exports.debug_showPoint = function(point) {
 
 var randomNumber = module.exports.randomNumber = function(min, max) {
     return Math.floor(Math.random() * (max - min + 1) + min);
-}
-
-var WsServer,WsOkHttpClient,WsListener = {
-    onOpen: function (webSocket, response) {
-        log("websocket 连接服务端成功");
-        WebSocket = webSocket;
-    },
-    onMessage: function (webSocket, msg) { //msg为待执行脚本
-        log("websocket 收到消息", msg);
-        try {
-            var rst = eval(msg);
-            log('脚本执行return', rst);
-            WebSocket.send('脚本执行return：'+rst);
-        } catch (e) {
-            log('脚本执行异常', e);
-            WebSocket.send('脚本执行异常' + e);
-        }
-    },
-    onClosing: function (webSocket, code, reason) {
-        WebSocket = null;
-        log("websocket 关闭中", code, reason);
-    },
-    onClosed: function (webSocket, code, response) {
-        WebSocket = null;
-        log("websocket 关闭", code);
-    },
-    onFailure: function (webSocket, t, response) {
-        log("websocket 异常，5秒后重试连接", t);
-        WebSocket = null;
-        setTimeout(websocket_init, 5000); //n秒后重连
-    }
-};
-function websocket_init(){
-    log("websocket 开始连接服务端", WsServer);
-    var request = new Request.Builder().url(WsServer).build();
-    WsOkHttpClient.newWebSocket(request, new WebSocketListener(WsListener)); //创建链接
-}
-
-/**
- * 建立与调试服务器的websocket连接
- * @param websocketServer websocket服务器地址，如ws://192.168.0.1:8080
- */
-var ws_debug = module.exports.ws_debug = function(websocketServer) {
-    importPackage(Packages["okhttp3"]); //导入包
-    
-    WsServer = websocketServer;
-    
-    if(!WsOkHttpClient){
-        WsOkHttpClient = new OkHttpClient.Builder().retryOnConnectionFailure(true).build();
-        WsOkHttpClient.dispatcher().cancelAll();//清理一次
-    }
-    
-    websocket_init();
 }
 
 /**

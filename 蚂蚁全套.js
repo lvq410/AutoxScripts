@@ -13,7 +13,6 @@ common.setSaveCaptureScreen(false);
 common.setLogEnable(LogEnable);
 common.setSaveOcrRst(false);
 
-//common.ws_debug('ws://10.236.203.128:25030');
 //==================================================================================================全局变量
 var Run = false;
 
@@ -283,15 +282,15 @@ function forest_fallenLeaves(){
 function forest_findEnergy() {
     while(true){
         ui.run(() => { w.text.setText('识别并点击【找能量】'); });
-        var point = common.clickImg(['找能量.jpg','找能量3.jpg','找能量2.jpg'], {waitDisappearTimeout:3000});
+        var point = common.clickImg(/^找能量[0-9]*.jpg/, {waitDisappearTimeout:3000});
         if(!point) return '未找到【找能量】';
         
         //再次寻找【找能量】，如果找不到，说明已经收完
-        point = common.clickImg(['找能量.jpg','找能量3.jpg','找能量2.jpg'], {waitDisplayTimeout:2000, doClick:false});
+        point = common.clickImg(/^找能量[0-9]*.jpg/, {waitDisplayTimeout:2000, doClick:false});
         if(!point) return;
         
         ui.run(() => { w.text.setText('识别并点击【一键收】'); });
-        common.clickImg(['一键收.jpg','一键收2.jpg'], {waitDisappearTimeout:2000});
+        common.clickImg(/^一键收[0-9]*.jpg$/, {waitDisappearTimeout:2000});
     }
 }
 
@@ -315,19 +314,7 @@ function forest_rainEnergy(){
             return;
         }
         
-        log('检查当前是否是人机验证')
-        var btn = textMatches(/.*(请进行验证).*/).findOnce();
-        if(btn){
-            log('当前是人机验证页'); ui.run(() => { w.text.setText('当前是人机验证页，请进行人机验证'); });
-            while(btn!=null){
-                device.vibrate(2000);
-                sleep(2000);
-                btn = textMatches(/.*(请进行验证).*/).findOnce();
-            }
-            log('人机验证完成'); ui.run(() => { w.text.setText('人机验证完成'); });
-            sleep(2000);
-            continue;
-        }
+        if(waitWhileBotCheck()) continue; //出现人机验证后需要重新点【立即开启】，因此从头开始
         
         ui.run(() => { w.text.setText('识别绿色能量中'); });
         var screen = common.captureScreenx();
@@ -448,6 +435,7 @@ function farm(){
             did |= farm_intent(/.*体验番茄小说.*/, /去完成|去逛逛/);
             did |= farm_intent(/.*逛淘宝看视频领现金.*/, /去完成|去逛逛/);
             did |= farm_intent(/.*逛逛美团APP.*/, /去完成|去逛逛/);
+            did |= farm_intent(/.*去积攒芝麻粒.*/, /去完成|去逛逛/);
         }while(did)
         
         swipe(device.width / 2, device.height/2, device.width / 2, 0, 500);
@@ -644,62 +632,72 @@ function manor(){
     
     manor_home();
     
-    ui.run(() => { w.text.setText('点击【领饲料】'); });
-    var point = common.clickImg('庄园-领饲料.jpg', {waitDisappearTimeout:3000});
-    if(!point) return '超时未打开【领饲料】】';
-    
-    var btn = text('x180').findOne(5000);
-    if(!btn) return '超时未打开【领饲料】';
-    
-    for(var i=0; i<6; i++){
-        manor_receive()
+    for(var k=0; k<3; k++){
+        ui.run(() => { w.text.setText('点击【领饲料】'); });
+        var point = common.clickImg('庄园-领饲料.jpg', {waitDisappearTimeout:3000});
+        if(!point) return '超时未打开【领饲料】】';
         
-        manor_answer()
+        var btn = text('x180').findOne(5000);
+        if(!btn) return '超时未打开【领饲料】';
         
-        manor_hire()
-        
-        manor_video(); manor_video()
-        
-        manor_grocery()
-        
-        var did = false;
-        do{
-            did = false;
-            did |= manor_simple(/.*逛一逛我的芝麻.*/, '去完成');
-            did |= manor_simple(/.*逛一逛芝麻.*/, '去完成');
-            did |= manor_simple(/.*去生活号.*/, '去完成');
-            did |= manor_simple(/.*逛一逛余额宝会场.*/, '去完成');
-            did |= manor_simple(/.*逛一逛.*助农专场.*/, '去完成');
-            did |= manor_simple(/.*助力残疾人朋友们追梦.*/, '去完成');
-            did |= manor_simple(/.*逛逛花呗花花卡.*/, '去完成');
-            did |= manor_simple(/.*去支付宝会员签到.*/, '去完成');
-            did |= manor_simple(/.*去逛一逛蚂蚁新村.*/, '去完成');
-            did |= manor_simple(/.*去森林种树挑战赛看一看.*/, '去完成');
-            did |= manor_simple(/.*去芭芭农场逛一逛.*/, '去完成');
-            did |= manor_simple(/.*浏览.*专场.*得.*饲料.*/, '去完成');
+        for(var i=0; i<3; i++){
+            manor_receive()
             
-            did |= manor_intent(/去逛一逛淘金币小镇/, '去完成');
-            did |= manor_intent(/去逛一逛淘宝视频/, '去完成');
-            did |= manor_intent(/去闲鱼逛一逛/, '去完成');
-            did |= manor_intent(/去淘宝签到逛一逛/, '去完成');
-            did |= manor_intent(/去饿了么农场逛一逛/, '去完成');
-            did |= manor_intent(/去快手逛一逛/, '去完成');
-            did |= manor_intent(/去今日头条极速版逛一逛/, '去完成');
-            did |= manor_intent(/逛一逛UC浏览器/, '去完成');
-        }while(did)
+            manor_answer()
+            
+            manor_hire()
+            
+            for(var v=0; v<3; v++) {
+                if(!manor_video()) break;
+                sleep(2000);
+            }
+            
+            manor_grocery()
+            
+            var did = false;
+            do{
+                did = false;
+                did |= manor_simple(/.*逛一逛我的芝麻.*/, '去完成');
+                did |= manor_simple(/.*逛一逛芝麻.*/, '去完成');
+                did |= manor_simple(/.*去生活号.*/, '去完成');
+                did |= manor_simple(/.*逛一逛余额宝会场.*/, '去完成');
+                did |= manor_simple(/.*逛一逛.*助农专场.*/, '去完成');
+                did |= manor_simple(/.*助力残疾人朋友们追梦.*/, '去完成');
+                did |= manor_simple(/.*逛逛花呗花花卡.*/, '去完成');
+                did |= manor_simple(/.*去支付宝会员签到.*/, '去完成');
+                did |= manor_simple(/.*去逛一逛蚂蚁新村.*/, '去完成');
+                did |= manor_simple(/.*去森林种树挑战赛看一看.*/, '去完成');
+                did |= manor_simple(/.*去芭芭农场逛一逛.*/, '去完成');
+                did |= manor_simple(/.*浏览.*专场.*得.*饲料.*/, '去完成');
+                did |= manor_simple(/.*参与活动.*得.*饲料.*/, '去完成');
+                
+                did |= manor_intent(/去逛一逛淘金币小镇/, '去完成');
+                did |= manor_intent(/去逛一逛淘宝视频/, '去完成');
+                did |= manor_intent(/去闲鱼逛一逛/, '去完成');
+                did |= manor_intent(/去淘宝签到逛一逛/, '去完成');
+                did |= manor_intent(/去饿了么农场逛一逛/, '去完成');
+                did |= manor_intent(/去快手逛一逛/, '去完成');
+                did |= manor_intent(/去今日头条极速版逛一逛/, '去完成');
+                did |= manor_intent(/逛一逛UC浏览器/, '去完成');
+            }while(did)
+            
+            manor_kitchen()
+            
+            for(var l=0; l<4; l++){
+                if(!manor_lottery()) break;
+                sleep(2000);
+            }
+            
+            //向上滑动半屏
+            ui.run(() => { w.text.setText('向上滑动半屏'); });
+            swipe(device.width / 2, device.height/2, device.width / 2, 0, 1000);
+        }
         
-        manor_kitchen()
-        
-        manor_lottery(); sleep(2000); manor_lottery(); sleep(2000); manor_lottery();
-        
-        //向上滑动半屏
-        swipe(device.width / 2, device.height/2, device.width / 2, device.height/3, 1000);
+        ui.run(() => { w.text.setText('关闭【领饲料】'); });
+        var btn = text('关闭').findOne(5000);
+        if(!btn) return '超时未找到【领饲料】的关闭按钮';
+        common.clickIfParent(btn); sleep(2000)
     }
-    
-    ui.run(() => { w.text.setText('关闭【领饲料】'); });
-    var btn = text('关闭').findOne(5000);
-    if(!btn) return '超时未找到【领饲料】的关闭按钮';
-    common.clickIfParent(btn); sleep(2000)
     
     for (var i = 0; i < 15; i++) {
         log('点击【喂养】'+(i+1)+'/10'); ui.run(() => { w.text.setText('点击【喂养】'+(i+1)+'/10'); });
@@ -788,6 +786,8 @@ function manor_video(){
     back(); sleep(2000)
     
     manor_receive()
+    
+    return true;
 }
 
 function manor_grocery(){
@@ -1087,6 +1087,8 @@ function manor_lottery(){
     }
     
     manor_receive()
+    
+    return true;
 }
 
 function manor_diary(){
@@ -1434,18 +1436,7 @@ function browser_ad(){
     var count = btn?45000:30000;
     log('开始浏览广告，时长', count, 's'); ui.run(() => { w.text.setText('开始浏览广告，时长'+(count/1000)+'s'); });
     for(var i=0; i<count;){
-        log('检查当前是否是人机验证')
-        var btn = textMatches(/.*(拖动下方滑块).*/).findOnce();
-        if(btn){
-            log('当前是人机验证页'); ui.run(() => { w.text.setText('当前是人机验证页，请进行人机验证'); });
-            while(btn!=null){
-                device.vibrate(2000);
-                sleep(2000);
-                btn = textMatches(/.*(拖动下方滑块).*/).findOnce();
-            }
-            log('人机验证完成'); ui.run(() => { w.text.setText('人机验证完成'); });
-            sleep(2000);
-        }
+        waitWhileBotCheck();
         
         if(!guessSearchFlag){
             log('检查是否有【搜索有福利|猜你想搜】标志 ');
@@ -1478,14 +1469,15 @@ function browser_ad(){
                 //这玩意儿的控件无法点击，只能用坐标点击方式
                 press(btn.bounds().centerX(), btn.bounds().centerY(), 1); sleep(500);
                 hasFertilizer = true;
+                count = 45000; //有肥料奖励时，拉长看广告时间以尽量收集齐
             })
         } else {
             log('没有【可得肥料+100】 按钮');
         }
         
         log('滑动窗口'); ui.run(() => { w.text.setText('浏览广告，滑动窗口'+(i/1000)+'/'+(count/1000)); });
-        if(hasFertilizer) { //有肥料奖励时，向上滑动1屏
-            swipe(device.width / 2, device.height-800, device.width / 2, 0, 500);
+        if(hasFertilizer) { //有肥料奖励时，向上滑动半屏
+            swipe(device.width / 2, device.height/2, device.width / 2, 0, 500);
             i+=500;
         }else{ //默认滑动是小范围上下摆动
             swipe(device.width / 2, device.height/2, device.width / 2, device.height/2-100, 500);
@@ -1506,6 +1498,37 @@ function browser_ad(){
             log('找到【搜索有福利】再执行一次返回', btn.bounds()); ui.run(() => { w.text.setText('找到【搜索有福利】再执行一次返回'); });
             back(); sleep(2000)
         }
+    }
+}
+
+/**
+ * 出现人机验证时，震动提醒并等待
+ * @returns true:出现且完成了人机验证；false：未出现人机验证
+ */
+function waitWhileBotCheck(){
+    var btn = textMatches(/.*(拖动下方滑块).*/).findOnce();
+    if(btn){
+        log('当前是人机验证页'); ui.run(() => { w.text.setText('当前是人机验证页，请进行人机验证'); });
+        while(btn!=null){
+            device.vibrate(2000);
+            sleep(2000);
+            btn = textMatches(/.*(拖动下方滑块).*/).findOnce();
+        }
+        log('人机验证完成'); ui.run(() => { w.text.setText('人机验证完成'); });
+        sleep(2000);
+        return true;
+    }
+    var btn = textMatches(/.*(请进行验证).*/).findOnce();
+    if(btn){
+        log('当前是人机验证页'); ui.run(() => { w.text.setText('当前是人机验证页，请进行人机验证'); });
+        while(btn!=null){
+            device.vibrate(2000);
+            sleep(2000);
+            btn = textMatches(/.*(请进行验证).*/).findOnce();
+        }
+        log('人机验证完成'); ui.run(() => { w.text.setText('人机验证完成'); });
+        sleep(2000);
+        return true;
     }
 }
 
