@@ -347,6 +347,7 @@ var captureScreenx = module.exports.captureScreenx = function() {
     images.save(resized, './临时.png', 'png');
     resized.recycle();
     screen = images.read('./临时.png');
+    files.remove('./临时.png');
     CaptureScreenxs.push(screen);
     return screen;
 }

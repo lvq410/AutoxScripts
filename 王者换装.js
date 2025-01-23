@@ -17,22 +17,22 @@ var MinSwipeDistance = 50 //低于这个距离王者不认为有操作
 /** 金币字体颜色 */
 var MoneyFontColor = colors.parseColor('#FEE895')
 /** 金币颜色容差 */
-var MoneyFontColorTolerance = 10
+var MoneyFontColorTolerance = 20
 
 /** 空装备栏颜色 */
 var EmptyEquipColor = colors.parseColor('#0D2338');
 /** 空装备栏颜色容差 */
-var EmptyEquipColorTolerance = 10;
+var EmptyEquipColorTolerance = 20;
 
 /** 购买按钮颜色 */
 var BuyBtnColor = colors.parseColor('#A1804B')
 /** 购买按钮颜色容差 */
-var BuyBtnColorTolerance = 10
+var BuyBtnColorTolerance = 20
 
 /** 卖出按钮颜色 */
 var SaleBtnColor = colors.parseColor('#376BA4')
 /** 卖出按钮颜色容差 */
-var SaleBtnColorTolerance = 10
+var SaleBtnColorTolerance = 20
 
 //==================================================================================================存储与配置
 //storages.remove("com.lvt4j.autox.honorofkings.v2")
@@ -489,9 +489,9 @@ function change(){
     
     common.log('等待商店打开')
     while(true){
+        sleep(10);
         Screen = common.captureScreenx();
         if(isShopOpen(Screen)) break;
-        sleep(10);
         if(new Date().getTime() - startTime > 500) {
             throw new Error('等待商店打开超时');
         }
@@ -500,7 +500,7 @@ function change(){
     
     //提取金币
     var money = moneyExtract(Screen);
-    if (!money) throw new Error('未识别到金币');
+    if(money == null || isNaN(money)) throw new Error('未识别到金币');
     common.log('金币', money)
     
     //是否已有目标装备
@@ -716,16 +716,15 @@ function moneyExtract(screen){
     if(ocrY<0) ocrY = 0;
     moneyImg = images.clip(screen, MoneyPoint.x, ocrY, Math.max(MoneyPoint.w, common.PaddleOcrMin.w), Math.max(MoneyPoint.h, common.PaddleOcrMin.h));
     var ocrRst = paddle.ocr(moneyImg); moneyImg.recycle();
-    common.log('金币ocr结果', ocrRst)
     for (var i = 0; i < ocrRst.length; i++) {
         var rst = ocrRst[i];
         var bounds = rst.bounds;
-        bounds.left += MoneyPoint.x;
-        bounds.top += ocrY;
-        bounds.right += MoneyPoint.x;
-        bounds.bottom += ocrY;
+        bounds.left += MoneyPoint.x + 1; //坐标值有小数时，会导致下面范围是否包含的判断有偏差，因此缩小1个像素
+        bounds.top += ocrY + 1;
+        bounds.right += MoneyPoint.x - 1;
+        bounds.bottom += ocrY - 1;
         if(bounds.left < MoneyPoint.x || bounds.top < MoneyPoint.y || bounds.right > MoneyPoint.x + MoneyPoint.w || bounds.bottom > MoneyPoint.y + MoneyPoint.h) continue;
-        var numStr = rst.text.match(/\d+/g).join('')
+        var numStr = (rst.text.match(/\d+/g)||[]).join('')
         if(!numStr) continue;
         return parseInt(numStr);
     }
@@ -824,12 +823,12 @@ function saleEquip(x, y){
     var startTime = new Date().getTime();
     while(true){
         press(x, y, 1)
+        sleep(1);
         Screen = common.captureScreenx();
         if(isSaleBtnShow(Screen)){
             common.log('卖出按钮已显示')
             break;
         }
-        sleep(1);
         if (new Date().getTime() - startTime > 500) {
             //throw new Error('等待卖出按钮显示超时'); //某些莫名奇妙的情况下，没识别到卖出按钮出现与销售，但实际上已经卖出了
             break;
@@ -840,9 +839,9 @@ function saleEquip(x, y){
     startTime = new Date().getTime();
     while (true) {
         press(SaleBtnPoint.x + SaleBtnPoint.w / 2, SaleBtnPoint.y + SaleBtnPoint.h / 2, 1)
+        sleep(1);
         Screen = common.captureScreenx();
         if(!isSaleBtnShow(Screen)) break;
-        sleep(10);
         if (new Date().getTime() - startTime > 500) {
             throw new Error('点击卖出按钮直到其消失 超时');
         }
@@ -878,15 +877,12 @@ function itemChoseAndEquipSelectThenBuy(meta){
 //                EquipSelectPoint.x + EquipSelectPoint.w/2, EquipSelectPoint.y + EquipSelectPoint.h/2+EquipSelectPoint.h/15, //必须有一点向下划动的距离
 //            500); //必须要足够长的时间，才能阻止滚动
 //    }
-    var itemPoint = eval(meta.itemPointKey);
-    common.log('点击栏目按钮', itemPoint.x + itemPoint.w/2, itemPoint.y + itemPoint.h/2)
-    press(itemPoint.x + itemPoint.w/2, itemPoint.y + itemPoint.h/2, 1)
 
-    common.log('等待装备出现')
+    var itemPoint = eval(meta.itemPointKey);
     var equipSelectFindImgRst;
     var startTime = new Date().getTime();
     while(!equipSelectFindImgRst){
-        Screen = common.captureScreenx();
+        //先在装备选择区找图，因为王者的商店会记录上次打开的装备栏目，因此有可能已经可以在装备选择区找到了，尤其是默认的【推荐】栏
         equipSelectFindImgRst = images.findImage(Screen, meta.imgSelect, {threshold: 0.8, region:[
             EquipSelectPoint.x, EquipSelectPoint.y, EquipSelectPoint.w, EquipSelectPoint.h
         ]});
@@ -898,22 +894,25 @@ function itemChoseAndEquipSelectThenBuy(meta){
             };
             break;
         }
-        sleep(10);
         if (new Date().getTime() - startTime > 500) {
             throw new Error('等待装备出现超时');
         }
+        common.log('点击栏目按钮，等待装备出现', itemPoint.x + itemPoint.w/2, itemPoint.y + itemPoint.h/2)
+        press(itemPoint.x + itemPoint.w/2, itemPoint.y + itemPoint.h/2, 1)
+        sleep(1);
+        Screen = common.captureScreenx();
     }
     
     common.log('点击装备，等待购买按钮出现');
     var startTime = new Date().getTime();
     while(true){
         press(equipSelectFindImgRst.x, equipSelectFindImgRst.y, 1);
+        sleep(1);
         Screen = common.captureScreenx();
         if(isBuyBtnShow(Screen)){
             common.log('购买按钮已显示')
             break;
         }
-        sleep(10);
         if (new Date().getTime() - startTime > 500) {
             throw new Error('等待购买按钮显示超时');
         }
@@ -923,9 +922,9 @@ function itemChoseAndEquipSelectThenBuy(meta){
     startTime = new Date().getTime();
     while(true){
         press(BuyBtnPoint.x+BuyBtnPoint.w/2, BuyBtnPoint.y+BuyBtnPoint.h/2, 1) //点击购买
+        sleep(1);
         Screen = common.captureScreenx();
         if(!isBuyBtnShow(Screen)) break;
-        sleep(1);
         if (new Date().getTime() - startTime > 500) {
             throw new Error('点击购买按钮直到其消失 超时');
         }
@@ -951,24 +950,6 @@ function shopClose(){
 }
 
 //==================================================================================================实验函数
-/** 金币提取 */
-function lab_moneyExtract(){
-    var screen = common.captureScreenx();
-    //ocr仅识别金币区域时会导致崩溃，可能因为金币区域图片太小，因此改为识别商店按钮加金币区域
-//    var moneyImg = images.clip(screen, P.money.left, P.money.top, P.money.right-P.money.left, P.money.bottom-P.money.top);
-    var moneyImg = images.clip(screen, P.shop.left, P.shop.top, P.shop.right-P.shop.left, P.shop.bottom-P.shop.top);
-    var ocrRst = paddle.ocr(moneyImg);
-    common.log('ocr', ocrRst);
-    var text = '';
-    for(var i = 0; i < ocrRst.length; i++){
-        var rst = ocrRst[i];
-        var bounds = rst.bounds;
-        if(bounds.left < P.money2shop.left || bounds.top < P.money2shop.top || bounds.right > P.money2shop.right || bounds.bottom > P.money2shop.bottom) continue;
-        text += rst.text;
-    }
-    return parseInt(text);
-}
-
 /**
  * 商店展开之后的左侧栏目选择
  */
@@ -1167,6 +1148,100 @@ function lab_compare_ocr_paddle_gmlkit(){
     }
     endTime = new Date().getTime();
     common.log('gmlkit ocr耗时', endTime - startTime); //
+}
+
+/**
+ * 实验函数：用tesseract ocr识别金币
+ * 结论：tesseract ocr识别金币非常不准确
+ */
+function moneyExtractByTessOcr(screen){
+    var Tessocr;
+    if(!Tessocr){
+        importClass(com.googlecode.tesseract.android.TessBaseAPI)
+        Tessocr = new TessBaseAPI()
+        var dataPath = files.path("./")
+        var ok = Tessocr.init(dataPath, "eng")
+        if (!ok) throw new Error('tesseract 初始化失败');
+        common.log('tesseract 初始化成功：' + Tessocr.getInitLanguagesAsString());
+    }
+    
+    var moneyImg = images.clip(screen, MoneyPoint.x, MoneyPoint.y, MoneyPoint.w, MoneyPoint.h);
+    Tessocr.setImage(moneyImg.getBitmap())
+    
+    var text = Tessocr.getUTF8Text();
+    common.log('tesseract ocr结果', text);
+    var numStr = (text.match(/\d+/g)||[]).join('')
+    if(!numStr) return;
+    return parseInt(numStr);
+}
+
+function lab_try_tesseract(){
+    //var screen = images.read(MediaDir+'场景/有空槽位.jpg')
+    var screen = images.read(MediaDir+'场景/金身冷却中.jpg')
+    
+    importClass(com.googlecode.tesseract.android.TessBaseAPI)
+    var tessocr = new TessBaseAPI()
+    var dataPath = files.path("./")
+    var ok = tessocr.init(dataPath, "eng")
+    if(!ok) throw new Error('tesseract 初始化失败');
+    common.log('tesseract 初始化成功：'+tessocr.getInitLanguagesAsString());
+    
+    var moneyImg = images.clip(screen, MoneyPoint.x, MoneyPoint.y, MoneyPoint.w, MoneyPoint.h);
+    
+    //tessocr.setRectangle(MoneyPoint.x, MoneyPoint.y, MoneyPoint.w, MoneyPoint.h)
+    //tessocr.setImage(screen.getBitmap())
+    
+    tessocr.setImage(moneyImg.getBitmap())
+    tessocr.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO);
+    //common.log('tesseract ocrRst', tessocr.getUTF8Text());
+    
+    var recognizedText = tessocr.getUTF8Text();
+    common.log("识别结果: " + recognizedText);
+    
+    //tessocr.recognize();
+    var iterator = tessocr.getResultIterator();
+    iterator.begin();
+    do {
+        var wordBoundingBox = iterator.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_WORD);
+        var word = iterator.getUTF8Text(TessBaseAPI.PageIteratorLevel.RIL_WORD);
+        common.log("单词: " + word + " 区域坐标: " + wordBoundingBox.toShortString());
+    } while (iterator.next(TessBaseAPI.PageIteratorLevel.RIL_WORD));
+    
+}
+
+/**
+ * 实验函数：对比 paddle ocr 和 tesseract ocr 速度
+ * 结论 tesseract ocr比paddle ocr快近10倍
+ */
+function lab_compare_ocr_paddle_tesseract(){
+    var screen = images.read(MediaDir+'场景/有空槽位.jpg')
+    
+    var moneyImg4Paddle = images.clip(screen, MoneyPoint.x, MoneyPoint.y, Math.max(MoneyPoint.w, common.PaddleOcrMin.w), Math.max(MoneyPoint.h, common.PaddleOcrMin.h));
+    var moneyImg = images.clip(screen, MoneyPoint.x, MoneyPoint.y, MoneyPoint.w, MoneyPoint.h);
+    
+    var startTime = new Date().getTime();
+    for (var i = 0; i < 10; i++) {
+        var ocrRst = paddle.ocr(moneyImg4Paddle);
+        common.log('paddle ocrRst', ocrRst);
+    }
+    var endTime = new Date().getTime();
+    common.log('paddle ocr耗时', endTime - startTime); //1055
+
+    //训练数据下载地址 https://github.com/tesseract-ocr/tessdata/tree/4.0.0
+    importClass(com.googlecode.tesseract.android.TessBaseAPI)
+    var tessocr = new TessBaseAPI()
+    var dataPath = files.path("./")
+    var ok = tessocr.init(dataPath, "eng+chi_sim")
+    if(!ok) throw new Error('tesseract 初始化失败');
+    common.log('tesseract 初始化成功：'+tessocr.getInitLanguagesAsString());
+    
+    startTime = new Date().getTime();
+    for (var i = 0; i < 10; i++) {
+        tessocr.setImage(moneyImg.getBitmap())
+        common.log('tesseract ocrRst', tessocr.getUTF8Text());
+    }
+    endTime = new Date().getTime();
+    common.log('tesseract ocr耗时', endTime - startTime); //122
 }
 
 /**
