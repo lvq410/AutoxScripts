@@ -254,6 +254,9 @@ var EquipZone = equipZoneInit();
 
 /** 常用变量：当前屏幕截图 */
 var Screen;
+
+/** 当前是否在换装中，用于防止运行时多次点击 */
+var Running;
 //==================================================================================================悬浮窗
 var MainW = floaty.window(
     <vertical alpha="0.4">
@@ -295,6 +298,7 @@ MainW.blade.on('click', function() { toggleChangeable('blade'); });
 MainW.wing.on('click', function() { toggleChangeable('wing'); });
 MainW.fire.on('click', function() { toggleChangeable('fire'); });
 function toggleChangeable(equip) {
+    if(Running) return;
     function removeEquipFromQueue(equip){
         EquipChangeQueueIndex = EquipChangeQueueIndex % EquipChangeQueue.length;
         var index = EquipChangeQueue.indexOf(equip);
@@ -436,12 +440,14 @@ setInterval(function(){}, 1000);
 /** 从设置切换回运行模式，会立刻触发一个click事件，用该变量阻止这次事件的运行 */
 var JustChangeMode = false;
 MainW.btn.on('click', function(){
+    if(Running) return;
     var mode = MainW.btn.getText();
     if(mode == '设置') return;
     if (JustChangeMode) {
         JustChangeMode = false;
         return;
     }
+    Running = true;
     threads.start(()=>{
         try {
             ui.run(()=>{MainW.btn.attr('bg', '#00ff00')});
@@ -455,11 +461,13 @@ MainW.btn.on('click', function(){
             common.log('执行异常'+e)
         }finally{
             ui.run(()=>{MainW.btn.attr('bg', '#000000')});
+            Running = false;
         }
     });
 });
 
 MainW.btn.on('long_click', function(){
+    if(Running) return;
     var mode = MainW.btn.getText();
     if(mode == '设置') {
         JustChangeMode = true;
@@ -468,7 +476,6 @@ MainW.btn.on('long_click', function(){
         change2SettingMode()
     }
 });
-
 
 
 /**
@@ -1126,7 +1133,7 @@ function lab_compare_ocr_big_small(){
 
 /**
  * 实验函数：对比 paddle ocr 和 gmlkit ocr 速度
- * 结论 gmlkit ocr不可用
+ * 结论 gmlkit ocr动不动就卡死，并且 耗时没多大区别
  */
 function lab_compare_ocr_paddle_gmlkit(){
     var screen = images.read(MediaDir+'场景/有空槽位.jpg')
@@ -1139,15 +1146,15 @@ function lab_compare_ocr_paddle_gmlkit(){
         common.log('paddle ocrRst', ocrRst);
     }
     var endTime = new Date().getTime();
-    common.log('paddle ocr耗时', endTime-startTime); //
+    common.log('paddle ocr耗时', endTime-startTime); //810
     
     startTime = new Date().getTime();
     for (var i = 0; i < 10; i++) {
-        var ocrRst = gmlkit.ocr(moneyImg, 'en');
+        var ocrRst = gmlkit.ocr(moneyImg, "zh").toArray(3);
         common.log('gmlkit ocrRst', ocrRst);
     }
     endTime = new Date().getTime();
-    common.log('gmlkit ocr耗时', endTime - startTime); //
+    common.log('gmlkit ocr耗时', endTime - startTime); //801
 }
 
 /**

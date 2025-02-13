@@ -122,14 +122,13 @@ function forest(){
     ui.run(() => { w.text.setText('等待并点击【蚂蚁森林】'); });
     var btn = text('蚂蚁森林').findOne(5000);
     if(!btn) return '未找到【蚂蚁森林】';
-    common.clickIfParent(btn);
+    common.clickIfParent(btn); sleep(3000)
     
+    closeDialog(true)
     ui.run(() => { w.text.setText('等待【蚂蚁森林】打开'); });
     var btn = text('去保护').findOne(5000);
     if(btn) sleep(2000);
     else return '超时未打开【蚂蚁森林】';
-    
-    closeDialog(true)
     
     forest_fallenLeaves();
     
@@ -286,21 +285,11 @@ function forest_findEnergy() {
         ui.run(() => { w.text.setText('识别并点击【找能量】'); });
         var point = common.clickImg(/^找能量[0-9]*.jpg/, {waitDisappearTimeout:3000});
         if(!point) return '未找到【找能量】';
+        sleep(2000)
         
         //再次寻找【找能量】，如果找不到，说明已经收完
-        point = common.clickImg(/^找能量[0-9]*.jpg/, {waitDisplayTimeout:2000, doClick:false});
-        if(!point){
-            //检查有没有弹窗，如果有弹窗，关闭弹窗，并再重新找【找能量】
-            var btn = className('android.widget.Button').desc('关闭').findOnce();
-            if(btn) {
-                common.clickIfParent(btn);
-                
-                point = common.clickImg(/^找能量[0-9]*.jpg/, {waitDisplayTimeout:3000, doClick:false});
-                if(!point) return;
-            }else{ //没有弹窗，说明真的已经收完
-                return;
-            }
-        }
+        point = common.clickImg(/^找能量[0-9]*.jpg/, {waitDisplayTimeout:3000, doClick:false});
+        if(!point) return;
         
         ui.run(() => { w.text.setText('识别并点击【一键收】'); });
         common.clickImg(/^一键收[0-9]*.jpg$/, {waitDisappearTimeout:2000});
@@ -435,7 +424,7 @@ function farm(){
             //did |= farm_simple(/.*逛一逛农场乐园.*/, /去完成|去逛逛/);
             did |= farm_simple(/.*逛一逛信用卡积分页.*/, /去完成|去逛逛/);
             did |= farm_simple(/.*逛一逛花呗活动.*/, /去完成|去逛逛/);
-            did |= farm_simple(/.*逛三峡好货得肥料.*/, /去完成|去逛逛/, true);
+            did |= farm_simple(/.*逛.*好货得肥料.*/, /去完成|去逛逛/, true);
             did |= farm_simple(/.*去领取你的商家奖励.*/, /去完成|去逛逛/);
             
             did |= farm_intent(/.*逛一逛快手.*/, /去完成|去逛逛/);
@@ -688,6 +677,7 @@ function manor(){
                 
                 did |= manor_intent(/去逛一逛淘金币小镇/, '去完成');
                 did |= manor_intent(/去逛一逛淘宝视频/, '去完成');
+                did |= manor_intent(/去逛一逛淘宝芭芭农场/, '去完成');
                 did |= manor_intent(/去闲鱼逛一逛/, '去完成');
                 did |= manor_intent(/去淘宝签到逛一逛/, '去完成');
                 did |= manor_intent(/去饿了么农场逛一逛/, '去完成');
@@ -734,7 +724,7 @@ function manor_home(){
     var btn = common.clickImg('庄园-家庭.jpg', {threshold:0.8});
     if(!btn) return;
     
-    sleep(3000)
+    sleep(5000)
     closeDialog()
     closeDialog(true)
     
@@ -826,10 +816,13 @@ function manor_grocery(){
     manor_receive()
 }
 
+var ManorSimpleCount = {};
 /**
  * 蚂蚁庄园里简单的点进去后再回退就能完成的任务
  */
 function manor_simple(jobTitlePattern, jobEnterBtnText){
+    if((ManorSimpleCount[jobTitlePattern]||0) > 2) return;
+    
     ui.run(() => { w.text.setText('检查【'+jobTitlePattern+'】'); });
     var btn = textMatches(jobTitlePattern).findOnce();
     if(!btn) return;
@@ -848,13 +841,16 @@ function manor_simple(jobTitlePattern, jobEnterBtnText){
     
     manor_receive()
     
+    ManorSimpleCount[jobTitlePattern] = (ManorSimpleCount[jobTitlePattern]||0) + 1;
     return true;
 }
 
+var ManorIntentCount = {};
 /**
  * 蚂蚁庄园里简单的跳到另一个app后再回退就能完成的任务
  */
 function manor_intent(jobTitlePattern, jobEnterBtnText){
+    if((ManorIntentCount[jobTitlePattern]||0) > 2) return;
     common.log('检查【'+jobTitlePattern+'】'); ui.run(() => { w.text.setText('检查【'+jobTitlePattern+'】'); });
     var btn = textMatches(jobTitlePattern).findOnce();
     if(!btn){
@@ -891,6 +887,7 @@ function manor_intent(jobTitlePattern, jobEnterBtnText){
     
     manor_receive()
     
+    ManorIntentCount[jobTitlePattern] = (ManorIntentCount[jobTitlePattern]||0) + 1;
     return true;
 }
 
@@ -1593,7 +1590,10 @@ function closeDialog(dialog){
     }else{
         btn = text('关闭').findOnce();
     }
-    if(btn) common.clickIfParent(btn);
+    if(btn){
+        common.clickIfParent(btn);
+        return true;
+    }
 }
 
 //==================================================================================================小鸡乐园
