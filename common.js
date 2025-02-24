@@ -16,8 +16,8 @@ var WsServer,WsOkHttpClient,WebSocket,WsListener = {
                 log('脚本执行return', rst);
                 if(WebSocket!=null) WebSocket.send('脚本执行return：'+JSON.stringify(rst));
             } catch (e) {
-                log('脚本执行异常', e);
-                if(WebSocket!=null) WebSocket.send('脚本执行异常' + e);
+                log('脚本执行异常', e.message, e);
+                if(WebSocket!=null) WebSocket.send('脚本执行异常' + e.message+' at '+e.stack);
             }
         });
     },
@@ -47,17 +47,18 @@ function websocket_init(){
  * 判断是否启动 与调试服务器的websocket连接
  */
 var wsDebugConfFile = files.cwd() + '/debug_server_conf.json';
+var DebugConf = {};
 if(files.exists(wsDebugConfFile)){
-    var wsDebugConf = JSON.parse(files.read(wsDebugConfFile));
-    if(wsDebugConf.enable) { //建立与调试服务器的websocket连接
-        log("启动websocket调试服务："+wsDebugConf.server);
+    DebugConf = JSON.parse(files.read(wsDebugConfFile));
+    if(DebugConf.enable) { //建立与调试服务器的websocket连接
+        log("启动websocket调试服务："+DebugConf.server);
         
         importPackage(Packages["okhttp3"]); //导入包
         
         var engineId = engines.myEngine().getId();
         var scriptFileName = files.getName(engines.myEngine().getSource().toString());
         var id = engineId + '-' + scriptFileName;
-        WsServer = wsDebugConf.server+'?id='+encodeURIComponent(id);
+        WsServer = DebugConf.server+'?id='+encodeURIComponent(id);
         
         if(!WsOkHttpClient){
             WsOkHttpClient = new OkHttpClient.Builder().retryOnConnectionFailure(true).build();
@@ -116,16 +117,19 @@ var timestampFormat = module.exports.timestampFormat = function(time) {
 };
 
 /**
- * 点击图片
- * @param imgNames 图片文件名，在MediaDir下找。<pre>
+ * 点击图片操作
+ * @param imgNames
+ * <pre>
+ * 图片文件名，在MediaDir下找。
  * ●可以是单个字符串，如 'a.jpg'
  * ●也可以是多个字符串构成的数组，如 ['b.jpeg', 'c.png']
  * ●也可以是正则表达式，如 /^abc.*.jpg$/<br>
  * 代表多个值时时会依次查找，任意一个找到即算
  * </pre>
- * @param options<pre>
+ * @param options
+ * <pre>
  * 　{
- * 　　offset:{x:null,y:null},//点击位置相对于图片坐标的偏移。默认null表示图片正中心。{x:0,y:0}格式：x正数表示从最左向右便宜，负数表示从最右向左偏移；y同理
+ * 　　offset:{x:null,y:null},//点击位置相对于图片坐标的偏移。默认null表示图片正中心。{x:0,y:0}格式：x正数表示从最左向右偏移，负数表示从最右向左偏移；y同理
  * 　　gap:50,//等待图片出现/消失时的扫描间隔ms，默认50
  * 　　waitDisplayTimeout:0,//等待图片出现超时ms，默认0。0表示立刻进行图片扫描并点击
  * 　　doClick:true,//是否执行点击，默认true；false时直接返回点击位置，且不会再等待其消失
@@ -138,11 +142,16 @@ var timestampFormat = module.exports.timestampFormat = function(time) {
  * 　　threshold:0.9 //相似度阈值，0~1之间。默认0.9
  * 　}
  * </pre>
- * @return <pre>图片未出现返回null。出现则返回
+ * @return 
+ * <pre>
+ * 图片未出现返回null。出现则返回
  * 　{
  * 　　imgName: 'a.jpg', //出现的图片文件名，当imgNames为数组或正则时，有助于识别出现的是哪张图片
  * 　　x: 123, //点击坐标
  * 　　y: 456 //点击坐标
+ * 　　bounds:{ 图片坐标区域
+ * 　　　left,top,right,bottom,width,height 
+ * 　　}
  * 　　//,stillExists: true //等待图片消失超时时返回的对象中会多出该字段，表示超时时图片仍然存在
  * 　}
  * </pre>
@@ -155,7 +164,7 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
     var doClick = options.doClick == null ? true : options.doClick;
     var clickDuration = options.clickDuration || 100;
     var waitDisappearTimeout = options.waitDisappearTimeout || 0;
-    var loopClickWhileWaitDisappear = options.loopClickWhileWaitDisappear || true;
+    var loopClickWhileWaitDisappear = options.loopClickWhileWaitDisappear==null?true:options.loopClickWhileWaitDisappear;
     var exitWhileTimeout = options.exitWhileTimeout || false;
     var region = options.region;
     var threshold = options.threshold || 0.9;
@@ -176,8 +185,8 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
     }
     var imgMetas = imgNames.map(n=>{
         var img = images.read(MediaDir + n);
-        if (!img && LogEnable){
-            log('图片文件不存在', n);
+        if (!img){
+            if(LogEnable) log('图片文件不存在', n);
             return null;
         }
         return {
@@ -212,6 +221,14 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
                 if (LogEnable) log('图片出现', imgPoint);
                 clickPoint = {
                     imgName: imgMeta.name,
+                    bounds: {
+                        left: imgPoint.x,
+                        top: imgPoint.y,
+                        width: imgMeta.img.getWidth(),
+                        height: imgMeta.img.getHeight(),
+                        right: imgPoint.x + imgMeta.img.getWidth(),
+                        bottom: imgPoint.y + imgMeta.img.getHeight()
+                    }
                 }
                 if (offset.x == null) {
                     clickPoint.x = imgPoint.x + imgMeta.img.getWidth() / 2;
@@ -276,14 +293,6 @@ var clickImg = module.exports.clickImg = function(imgNames, options) {
     }
 }
 
-/**
- * 是否保存截图
- */
-var SaveCaptureScreen = false;
-module.exports.setSaveCaptureScreen = function(save) {
-    SaveCaptureScreen = save;
-    files.create(MediaDir + "截屏/");
-}
 var SaveCaptureScreenIdx = {};
 /**
  * 屏幕截图方向
@@ -315,12 +324,15 @@ var captureScreenx = module.exports.captureScreenx = function() {
     }
     var screen = captureScreen();
     var timestamp;
-    if (SaveCaptureScreen) {
+    if(DebugConf.enable) {
         timestamp = timestampFormat(new Date().getTime()).replace(/:/g, '-').replace(/ /g, '_');
         var idx = SaveCaptureScreenIdx[timestamp];
         if (idx == null) idx = SaveCaptureScreenIdx[timestamp] = 1;
         else idx = SaveCaptureScreenIdx[timestamp] = idx + 1;
-        images.save(screen, MediaDir + '截屏/' + timestamp + '_' + idx + '.png');
+        var captureScreenFileName = timestamp + '_' + idx + '.png';
+        var img64 = images.toBase64(screen);
+        try{if(WebSocket) WebSocket.send('_screen:'+captureScreenFileName+':'+img64);}catch(ig){}
+        common.log('截图', captureScreenFileName);
     }
     if (CaptureScreenLandscape == null) return screen;
     if (!CaptureScreenLandscape) return screen;
@@ -339,9 +351,12 @@ var captureScreenx = module.exports.captureScreenx = function() {
     var cliped = images.clip(screen, clipX, clipY, clipW, clipH);
     var resized = images.resize(cliped, [shouldWidth, shouldHeight])
     cliped.recycle()
-    if (SaveCaptureScreen) {
+    if (DebugConf.enable) {
         var idx = SaveCaptureScreenIdx[timestamp];
-        images.save(resized, MediaDir + '截屏/' + timestamp + '_' + idx + '_调整.png');
+        var captureScreenFileName = timestamp + '_' + idx + '_调整.png';
+        var img64 = images.toBase64(resized);
+        try{if(WebSocket) WebSocket.send('_screen:'+captureScreenFileName+':'+img64);}catch(ig){}
+        common.log('截图调整', captureScreenFileName);
     }
     //经过clip再resize的图片似乎有问题，提取像素，图片查找等函数会报错，将图片保存再读取一次可以避免这个问题
     images.save(resized, './临时.png', 'png');
@@ -424,82 +439,192 @@ var clickIfParent = module.exports.clickIfParent = function(widget) {
 }
 
 /**
- * ocr文字点击
- * @param textPattern 文案正则
- * @param options<pre>
- * 　{
- * 　　offset:{x:null,y:null},//点击位置相对于文字坐标的偏移。默认null表示文字正中心。{x:0,y:0}格式：x正数表示从最左向右偏移，负数表示从最右向左偏移；y同理
- * 　　gap:50,//等待文字出现/消失时的扫描间隔ms，默认50
- * 　　waitDisplayTimeout:0,//等待文字出现超时ms，默认0。0表示立刻进行文字扫描并点击
- * 　　doClick:true,//是否执行点击，默认true；false时直接返回点击位置，且不会再等待其消失
- * 　　clickDuration:100,//点击时长ms，默认100
- * 　　waitDisappearTimeout:0,//等待文字消失超时ms，默认0。0表示只点击一次立刻返回且不判断文字消失
- * 　　loopClickWhileWaitDisappear:true,//等待文字消失期间是否循环点击，默认true
- * 　　exitWhileTimeout:false,//执行超时时是否退出程序，默认false
- * 　　region:null,//寻找区域。是一个两个或四个元素的数组。(region[0], region[1])表示寻找区域的左上角；region[2]*region[3]表示寻找区域的宽高。如果只有 region 只有两个元素，则寻找区域为(region[0], region[1])到屏幕右下角。如果不指定 region 选项，则寻找区域为整个屏幕。
- * 　　threshold:0.9 //相似度阈值，0~1之间。默认0.9
- * 　}
+ * 通过ocr点击文字操作
+ * @param textPattern 
+ * <pre>
+ * 找寻文案：
+ *  可以为正则
+ *  也可以为字符串或字符串数组
+ *  也可以为一个函数，为函数时，传入参数为一段ocrRst，需返回confidence
  * </pre>
- * @return 点击坐标{x,y,text}。文字未出现返回null。等待文字消失超时时返回的对象中会多一个字段stillExists=true表示超时时文字仍然存在
+ * @param options 
+ * <pre>{
+ *  screenOcrRsts: //用给定屏幕ocr结果进行识别。null时则重新截图识别
+ *                 //如果指定了region参数，则给定的screenOcrRsts必须为对应region的
+ *  textPreProcess: //用ocr结果中文本与textPattern对比之前，可选择对ocr结果中的文本进行处理。默认null为不处理
+ *                  //如(str)=>str.replace(/[^\w\u4e00-\u9fa5]/g, '')，只保留中文和英文
+ *                  //textPattern为函数时，此参数无效
+ *  offset:{x:null,y:null}, //点击位置相对于文字坐标的偏移。默认null表示文字正中心。{x:0,y:0}格式：x正数表示从最左向右偏移，负数表示从最右向左偏移；y同理
+ *  gap:50, //等待文字出现/消失时的扫描间隔ms，默认50
+ *  waitDisplayTimeout:0, //等待文字出现超时ms，默认0。0表示立刻进行文字扫描并点击
+ *                        //注意如果给定了screenOcrRsts参数时，不要设置此参数>0，否则未找到结果时，会白白等待
+ *  doClick:true, //是否执行点击，默认true；false时直接返回点击位置，且不会再等待其消失
+ *  clickDuration:100, //点击时长ms，默认100
+ *  waitDisappearTimeout:0, //等待文字消失超时ms，默认0。0表示只点击一次立刻返回且不判断文字消失
+ *                          //注意如果给定了screenOcrRsts参数时，不要设置此参数>0，否则未找到结果时，会白白等待
+ *  loopClickWhileWaitDisappear:true, //等待文字消失期间是否循环点击，默认true
+ *  exitWhileTimeout:false, //执行超时时是否退出程序，默认false
+ *  region:null, //寻找区域。是一个两个或四个元素的数组。
+ *               //(region[0], region[1])表示寻找区域的左上角，region[2]*region[3]表示寻找区域的宽高
+ *               //如果只有 region 只有两个元素，则寻找区域为(region[0], region[1])到屏幕右下角
+ *               //如果不指定 region 选项，则寻找区域为整个屏幕。
+ *  threshold:0.9 //相似度阈值，0~1之间。
+ *                //textPattern为正则时，用ocr结果中的confidence与此值比较，默认0.9
+ *                //textPattern为字符串时，用编辑距离与此值比较，默认0.6
+ *                //textPattern为函数时，用函数返回结果作为confidence与此值比较，默认0.9
+ * }</pre>
+ * @return 
+ * <pre>
+ * 文字未出现返回null。否则返回
+ * {
+ *  text: 实际文字,
+ *  x: 点击坐标,
+ *  y: 点击坐标,
+ *  bounds:{ 实际文字坐标区域
+ *   left,top,right,bottom,width,height 
+ *  }
+ *  //,stillExists: true //等待文字消失超时 时，返回的对象中会多出该字段，表示超时时文字仍然存在
+ * }
+ * </pre>
  **/
 var clickOcr = module.exports.clickOcr = function(textPattern, options) {
+    var mode;
+    if(typeof textPattern == 'string'){
+        mode = 'string';
+        textPattern = [textPattern];
+    }else if(Array.isArray(textPattern)) mode = 'string';
+    else if(textPattern instanceof RegExp) mode = 'regexp';
+    else if (typeof textPattern == 'function') mode = 'function';
+    else throw 'textPattern参数类型错误';
+    
+    if(typeof textPattern == 'string') 
+    
     options = options || {};
     var gap = options.gap || 50;
     var waitDisplayTimeout = options.waitDisplayTimeout || 0;
     var doClick = options.doClick == null ? true : options.doClick;
     var clickDuration = options.clickDuration || 100;
     var waitDisappearTimeout = options.waitDisappearTimeout || 0;
-    var loopClickWhileWaitDisappear = options.loopClickWhileWaitDisappear || true;
+    var loopClickWhileWaitDisappear = options.loopClickWhileWaitDisappear==null?true:options.loopClickWhileWaitDisappear;
     var exitWhileTimeout = options.exitWhileTimeout || false;
     var region = options.region;
-    var threshold = options.threshold || 0.9;
+    var threshold = options.threshold; if(!threshold) threshold = mode=='string'?0.6:0.9;
     var offset = options.offset || {};
+    
+    //因为paddleOcr有最小图片识别的宽高要求，因此region有设置值时，需要检查并调整
+    var origRegion; //原始区域参数
+    var insideRegion; //将原始区域参数投影到截图区域后，相对于截图区域的参数
+    if(region){
+        origRegion = [region[0], region[1], region[2], region[3]];
+        
+        if(!region[2]) region[2] = device.width - region[0];
+        if(region[2] < module.exports.PaddleOcrMin.w) region[2] = module.exports.PaddleOcrMin.w;
+        if(region[0]+region[2] > device.width) region[0] = device.width - region[2];
+        
+        if(!region[3]) region[3] = device.height - region[1];
+        if(region[3] < module.exports.PaddleOcrMin.h) region[3] = module.exports.PaddleOcrMin.h;
+        if(region[1]+region[3] > device.height) region[1] = device.height - region[3];
+        
+        insideRegion = [origRegion[0]-region[0], origRegion[1]-region[1], origRegion[2], origRegion[3]];
+    }
 
-    function ocrFind(textPattern){
-        var screen = captureScreenx();
-        var ocrRst = paddle.ocr(screen);
+    function ocrFind(){
+        var screen;
+        var screenOcrRsts = options.screenOcrRsts;
+        if(!screenOcrRsts){
+            screen = captureScreenx();
+            if(region){
+                screen = images.clip(screen, region[0], region[1], region[2], region[3]);
+                CaptureScreenxs.push(screen);
+            }
+            for(var oi=0;oi<3;oi++){ //坑爹的ocr有时识别结果为空，因此多试几次
+                screenOcrRsts = paddle.ocr(screen, 4, false);
+                if(screenOcrRsts.length) break;
+            }
+            if(LogEnable) common.log('ocr结果', screenOcrRsts);
+        }
 
-        if(SaveOcrRst){
+        if(DebugConf.enable && !options.screenOcrRsts){
             timestamp = timestampFormat(new Date().getTime()).replace(/:/g, '-').replace(/ /g, '_');
             var idx = SaveCaptureScreenIdx[timestamp];
             if (idx == null) idx = SaveCaptureScreenIdx[timestamp] = 1;
             else idx = SaveCaptureScreenIdx[timestamp] = idx + 1;
-            images.save(screen, MediaDir + 'ocr/' + timestamp + '_' + idx + '.png');
-            files.write(MediaDir + 'ocr/' + timestamp + '_' + idx + '.json', JSON.stringify(ocrRst, null, 2));
+            var captureScreenFileName = timestamp + '_' + idx + '.png';
+            var img64 = images.toBase64(screen);
+            try{if(WebSocket) WebSocket.send('_screen:'+captureScreenFileName+':'+img64);}catch(ig){}
+            var captureScreenOcrFileName = timestamp + '_' + idx + '.ocr';
+            try{if(WebSocket) WebSocket.send('_ocr:'+captureScreenOcrFileName+':'+JSON.stringify(screenOcrRsts, null, 2));}catch(ig){}
+            common.log('ocr截图', captureScreenFileName, 'ocr结果', captureScreenOcrFileName);
         }
-        for(var i = 0; i < ocrRst.length; i++){
-            var rst = ocrRst[i];
-            if(!textPattern.test(rst.text)) continue;
-            if(rst.confidence < threshold) continue;
-            var bounds = rst.bounds;
-            if(region){
-                var regionLeft = region[0];
-                var regionTop = region[1];
-                var regionRight = region[2]?(region[0] + region[2]):device.width;
-                var regionBottom = region[3]?(region[1] + region[3]):device.height;
-                if(bounds.left < regionLeft || bounds.left > regionRight) continue;
-                if(bounds.top < regionTop || bounds.top > regionBottom) continue;
-                if(bounds.right < regionLeft || bounds.right > regionRight) continue;
-                if(bounds.bottom < regionTop || bounds.bottom > regionBottom) continue;
+        var matches = [];
+        screenOcrRsts.forEach(ocrRst=>{
+            var ocrText = options.textPreProcess?options.textPreProcess(ocrRst.text):ocrRst.text;
+            var confidence = 0;
+            switch(mode){
+            case 'string':
+                textPattern.forEach(text=>{
+                    if(ocrText==text){
+                        textMatch = true; confidence = 1;
+                        return;
+                    }
+                    var _confidence = 1 - editDistance(ocrText, text) / text.length;
+                    if(_confidence > confidence) confidence = _confidence;
+                })
+            break;
+            case 'regexp':
+                confidence = textPattern.test(ocrText) ? ocrRst.confidence : 0;
+                break;
+            case 'function':
+                confidence = textPattern(ocrRst);
+                break;
             }
-            return {
-                x: bounds.left,
-                y: bounds.top,
-                width: bounds.right - bounds.left,
-                height: bounds.bottom - bounds.top,
-                text: rst.text
-            };
+            if(confidence < threshold) return;
+            if(region){
+                if(ocrRst.bounds.left < insideRegion[0]) return;
+                if(ocrRst.bounds.top < insideRegion[1]) return;
+                if(ocrRst.bounds.right > insideRegion[0]+insideRegion[2]) return;
+                if(ocrRst.bounds.bottom > insideRegion[1]+insideRegion[3]) return;
+            }
+            matches.push({
+                ocrRst: ocrRst,
+                confidence: confidence
+            });
+        });
+        matches.sort((a,b)=>a.confidence-b.confidence);
+        var bestMatch = matches[0];
+        if(!bestMatch) return;
+        var rst = {
+            x: bestMatch.ocrRst.bounds.left,
+            y: bestMatch.ocrRst.bounds.top,
+            width: bestMatch.ocrRst.bounds.right - bestMatch.ocrRst.bounds.left,
+            height: bestMatch.ocrRst.bounds.bottom - bestMatch.ocrRst.bounds.top,
+            text: bestMatch.ocrRst.text
+        };
+        if(region){
+            rst.x += region[0];
+            rst.y += region[1];
         }
+        return rst;
     }
 
     var clickPoint;
-    if (LogEnable) log('等待文字出现', textPattern);
+    if (LogEnable) common.log('等待文字出现', textPattern);
     var textPoint; var waitBeginTime = new Date().getTime();
     while (true) {
         var textPoint = ocrFind(textPattern)
         if (textPoint) {
-            if (LogEnable) log('文字出现', textPoint);
-            clickPoint = {}
+            if (LogEnable) common.log('文字出现', textPoint);
+            clickPoint = {
+                text: textPoint.text,
+                bounds: {
+                    left: textPoint.x,
+                    top: textPoint.y,
+                    width: textPoint.width,
+                    height: textPoint.height,
+                    right: textPoint.x + textPoint.width,
+                    bottom: textPoint.y + textPoint.height
+                }
+            }
             if (offset.x == null) {
                 clickPoint.x = textPoint.x + textPoint.width / 2;
             } else if (offset.x >= 0) {
@@ -516,7 +641,6 @@ var clickOcr = module.exports.clickOcr = function(textPattern, options) {
                 clickPoint.y = textPoint.y + textPoint.height + offset.y;
             }
             clickPoint.y = parseInt(clickPoint.y)
-            clickPoint.text = textPoint.text;
             break;
         }
         if (waitDisplayTimeout == 0) break;
@@ -556,14 +680,6 @@ var clickOcr = module.exports.clickOcr = function(textPattern, options) {
     return clickPoint;
 }
 
-/**
- * 是否保存ocr识别结果
- */
-var SaveOcrRst = false;
-module.exports.setSaveOcrRst = function(save) {
-    SaveOcrRst = save;
-    files.create(MediaDir + "ocr/");
-}
 
 var closeApp = module.exports.closeApp = function(packageName) {
     openAppSetting(packageName);
@@ -653,3 +769,30 @@ module.exports.log = function() {
         log('websocket发送消息异常', msg, e);
     }
 };
+
+/** 编辑距离计算 */
+var editDistance = module.exports.editDistance = function(str1, str2) {
+  const len1 = str1.length;
+  const len2 = str2.length;
+  const dp = [];
+
+  for (let i = 0; i <= len1; i++) {
+    dp[i] = [i];
+  }
+
+  for (let j = 0; j <= len2; j++) {
+    dp[0][j] = j;
+  }
+
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
+    }
+  }
+
+  return dp[len1][len2];
+}

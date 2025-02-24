@@ -6,7 +6,6 @@ var MediaDir = engines.myEngine().cwd()+'/王者换装/'
 common.setMediaDir(MediaDir)
 common.setLogEnable(true)
 common.setCaptureScreenLandscape(true) // 横屏截图
-common.setSaveCaptureScreen(false)
 
 var deviceLong = Math.max(device.width, device.height)
 var deviceShort = Math.min(device.width, device.height)

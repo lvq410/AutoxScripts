@@ -10,9 +10,7 @@ var common = require('./common.js');
 
 common.setCaptureScreenLandscape(false);
 common.setMediaDir(MediaDir);
-common.setSaveCaptureScreen(false);
 common.setLogEnable(LogEnable);
-common.setSaveOcrRst(false);
 
 //==================================================================================================全局变量
 var Run = false;
@@ -37,7 +35,7 @@ var w = floaty.window(
 w.setAdjustEnabled(true)
 w.setSize(900, -2)
 setTimeout(function(){
-    w.setPosition(parseInt((device.width-w.getWidth())/2), 50)
+    w.setPosition(parseInt((device.width-w.getWidth())/2), 100)
 }, 100);
 w.exitOnClose()
 
@@ -71,7 +69,7 @@ function doRun(run){
             device.vibrate(2000);
         }catch(e){
             if(!Run) return;
-            common.log('脚本异常', e);
+            common.log('脚本异常', e, e.message);
             Run = false;
             ui.run(() => {
                 w.mainBtn.setEnabled(true); w.forestBtn.setEnabled(true); w.farmBtn.setEnabled(true); w.manorBtn.setEnabled(true); w.taobaoFarmBtn.setEnabled(true); w.adBtn.setEnabled(true); w.manorPlayAdBtn.setEnabled(true);
@@ -410,7 +408,7 @@ function farm(){
     for(var i = 0; i < 4; i++) {
         var did = false;
         do{
-            farm_receive();
+            farm_receive(); farm_catchChick();
             did = false;
             did |= farm_simple(/.*逛一逛支付宝会员.*/, /去完成|去逛逛/);
             did |= farm_simple(/.*逛一逛蚂蚁庄园.*/, /去完成|去逛逛/);
@@ -424,8 +422,9 @@ function farm(){
             //did |= farm_simple(/.*逛一逛农场乐园.*/, /去完成|去逛逛/);
             did |= farm_simple(/.*逛一逛信用卡积分页.*/, /去完成|去逛逛/);
             did |= farm_simple(/.*逛一逛花呗活动.*/, /去完成|去逛逛/);
-            did |= farm_simple(/.*逛.*好货得肥料.*/, /去完成|去逛逛/, true);
+            did |= farm_simple(/.*逛.*好货得肥料.*/, /去完成|去逛逛/, {browserAd:true});
             did |= farm_simple(/.*去领取你的商家奖励.*/, /去完成|去逛逛/);
+            did |= farm_simple(/.*看10s视频领肥料.*/, /去完成|去逛逛/,{sleep:15000});
             
             did |= farm_intent(/.*逛一逛快手.*/, /去完成|去逛逛/);
             did |= farm_intent(/.*逛一逛头条极速版.*/, /去完成|去逛逛/);
@@ -499,8 +498,9 @@ function farm_manorChickManure(){
     common.clickIfParent(btn); sleep(1000)
 }
 var FarmSimpleCount = {};
-function farm_simple(jobTitlePattern, jobEnterBtnPattern, browserAd){
+function farm_simple(jobTitlePattern, jobEnterBtnPattern, options){
     if((FarmSimpleCount[jobTitlePattern]||0) > 2) return;
+    options = options||{};
     
     common.log('检查【'+jobTitlePattern+'】'); ui.run(() => { w.text.setText('检查【'+jobTitlePattern+'】'); });
     var btn = textMatches(jobTitlePattern).findOnce();
@@ -529,10 +529,10 @@ function farm_simple(jobTitlePattern, jobEnterBtnPattern, browserAd){
     ui.run(() => { w.text.setText('点击【'+jobTitlePattern+'】的【'+jobEnterBtnPattern+'】'); });
     common.clickIfParent(btn);
     
-    if(browserAd){
+    if(options.browserAd){
         browser_ad()
     }else{
-        sleep(5000)
+        sleep(options.sleep||5000)
     }
     
     common.log('开始后退 返回农场'); ui.run(() => { w.text.setText('后退 返回农场'); });
@@ -600,6 +600,44 @@ function farm_intent(jobTitlePattern, jobEnterBtnPattern){
     FarmIntentCount[jobTitlePattern] = (FarmIntentCount[jobTitlePattern]||0) + 1;
     return true;
 }
+function farm_catchChick(){
+    common.log('检查【一键捉小鸡赚肥料】'); ui.run(() => { w.text.setText('检查【一键捉小鸡赚肥料】'); });
+    var btn = text('一键捉小鸡赚肥料').findOnce();
+    if(!btn){
+        common.log('未找到【一键捉小鸡赚肥料】');
+        return;
+    }
+    var visible = common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()});
+    common.log('找到【一键捉小鸡赚肥料】，坐标', btn.bounds(), '是否可见', visible);
+    if(!visible) return;
+    
+    
+    var entryBtn = btn;
+    common.log('检查【一键捉小鸡赚肥料】的【捉小鸡】'); ui.run(() => { w.text.setText('检查【一键捉小鸡赚肥料】的【捉小鸡】'); });
+    var btn = null;
+    text('捉小鸡').find().forEach(function(b) {
+        if(b.bounds().top> entryBtn.bounds().top && b.bounds().top < entryBtn.bounds().bottom) btn = b;
+    });
+    if(!btn){
+        common.log('未找到【一键捉小鸡赚肥料】的【捉小鸡】按钮');
+        return;
+    }
+    var visible = common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()});
+    common.log('找到【一键捉小鸡赚肥料】的【捉小鸡】按钮，坐标', btn.bounds(), '是否可见', visible);
+    if(!visible) return;
+    common.log('点击【一键捉小鸡赚肥料】的【捉小鸡】'); ui.run(() => { w.text.setText('点击【一键捉小鸡赚肥料】的【捉小鸡】'); });
+    common.clickIfParent(btn);
+    
+    common.log('检查【立即捉鸡】'); ui.run(() => { w.text.setText('检查【立即捉鸡】'); });
+    var btn = text('立即捉鸡赚500肥').findOne(3000);
+    if(!btn){
+        common.log('未找到【立即捉鸡】');
+        return;
+    }
+    common.log('找到【立即捉鸡】，坐标', btn.bounds());
+    common.clickIfParent(btn); sleep(2000)
+}
+
 function farm_receive(){
     common.log('检查是否有奖励可【领取】'); ui.run(() => { w.text.setText('检查是否有奖励可【领取】'); });
     var btn = textMatches(/领取/).findOnce();
@@ -636,67 +674,100 @@ function manor(){
     manor_home();
     
     for(var k=0; k<3; k++){
-        ui.run(() => { w.text.setText('点击【领饲料】'); });
-        var point = common.clickImg('庄园-领饲料.jpg', {waitDisappearTimeout:3000});
+        common.log('点击【领饲料】'); ui.run(() => { w.text.setText('点击【领饲料】'); });
+        var point = common.clickImg('庄园-领饲料.jpg', {waitDisappearTimeout:3000,loopClickWhileWaitDisappear:false});
         if(!point) return '超时未打开【领饲料】】';
         
         var btn = text('x180').findOne(5000);
         if(!btn) return '超时未打开【领饲料】';
         
-        for(var i=0; i<3; i++){
-            manor_receive()
-            
-            manor_answer()
-            
-            manor_hire()
-            
-            for(var v=0; v<3; v++) {
-                if(!manor_video()) break;
-                sleep(2000);
-            }
-            
-            manor_grocery()
-            
-            var did = false;
-            do{
-                did = false;
-                did |= manor_simple(/.*逛一逛我的芝麻.*/, '去完成');
-                did |= manor_simple(/.*逛一逛芝麻.*/, '去完成');
-                did |= manor_simple(/.*去生活号.*/, '去完成');
-                did |= manor_simple(/.*逛一逛余额宝会场.*/, '去完成');
-                did |= manor_simple(/.*逛一逛.*助农专场.*/, '去完成');
-                did |= manor_simple(/.*助力残疾人朋友们追梦.*/, '去完成');
-                did |= manor_simple(/.*逛逛花呗花花卡.*/, '去完成');
-                did |= manor_simple(/.*去支付宝会员签到.*/, '去完成');
-                did |= manor_simple(/.*去逛一逛蚂蚁新村.*/, '去完成');
-                did |= manor_simple(/.*去森林种树挑战赛看一看.*/, '去完成');
-                did |= manor_simple(/.*去芭芭农场逛一逛.*/, '去完成');
-                did |= manor_simple(/.*浏览.*专场.*得.*饲料.*/, '去完成');
-                did |= manor_simple(/.*参与活动.*得.*饲料.*/, '去完成');
-                did |= manor_simple(/.*去芝麻集福卡逛一逛.*/, '去完成');
+        var upSwipeCount = 3;
+        for(var i=0; i<upSwipeCount; i++){
+            for(var ti=0; ti<10; ti++){
+                var taskRst = manor_receive();
+                if(taskRst) continue;
                 
-                did |= manor_intent(/去逛一逛淘金币小镇/, '去完成');
-                did |= manor_intent(/去逛一逛淘宝视频/, '去完成');
-                did |= manor_intent(/去逛一逛淘宝芭芭农场/, '去完成');
-                did |= manor_intent(/去闲鱼逛一逛/, '去完成');
-                did |= manor_intent(/去淘宝签到逛一逛/, '去完成');
-                did |= manor_intent(/去饿了么农场逛一逛/, '去完成');
-                did |= manor_intent(/去快手逛一逛/, '去完成');
-                did |= manor_intent(/去今日头条极速版逛一逛/, '去完成');
-                did |= manor_intent(/逛一逛UC浏览器/, '去完成');
-                did |= manor_intent(/去淘宝春节.*逛一逛/, '去完成');
-            }while(did)
-            
-            manor_kitchen()
-            
-            for(var l=0; l<4; l++){
-                if(!manor_lottery()) break;
-                sleep(2000);
+                var screenOcrRsts = paddle.ocr(common.captureScreenx(), 4, false)
+                    .filter(ocrRst=>ocrRst.bounds.top>w.getY()+w.getHeight()); //将top小于悬浮窗的ocr结果干掉，防止因为悬浮窗上的提示导致误认
+                if(!screenOcrRsts.length) continue; //ocr不知道为啥，有时识别结果为空
+                common.log('screenOcrRsts', screenOcrRsts);
+                
+                var taskRst = task_basic_ocr({title:'庄园小课堂',enterBtnText:'去答题',run:manor_answer,titleThreshold:0.8,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'庄园小视频',enterBtnText:'去完成',run:manor_video,titleThreshold:0.8,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去杂货铺逛一逛',enterBtnText:'去完成',run:browser_ad,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'雇佣小鸡拿饲料',enterBtnText:'去完成',run:manor_hire,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'小鸡厨房',enterBtnText:'去完成',run:manor_kitchen,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:/抽抽乐.*/,enterBtnText:'去完成',run:manor_lottery,screenOcrRsts:screenOcrRsts,maxCount:4});
+                if(taskRst) continue;
+                
+                var taskRst = task_basic_ocr({title:'逛一逛我的芝麻',enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:/逛一逛芝麻.*/,enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:/.*去生活号.*/,enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'逛一逛余额宝会场',enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:/.*逛一逛.*助农专场.*/,enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'助力残疾人朋友们追梦',enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'逛逛花呗花花卡',enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去支付宝会员签到',enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去逛一逛蚂蚁新村',enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去森林种树挑战赛看一看',enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去芭芭农场逛一逛',enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:/.*浏览.*专场.*得.*饲料.*/,enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:/.*参与活动.*得.*饲料.*/,enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去芝麻集福卡逛一逛',enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去神奇海洋逛一逛',enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去支付宝运动逛一逛',enterBtnText:'去完成',run:manor_simple,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                
+                var taskRst = task_basic_ocr({title:'去逛一逛淘宝视频',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去逛一逛淘宝芭芭农场',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去逛一逛淘金币小镇',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去闲鱼逛一逛',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去淘宝签到逛一逛',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去饿了么农场逛一逛',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去快手逛一逛',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去今日头条极速版逛一逛',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'逛一逛UC浏览器',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'逛一逛小羊农场',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                
+                break;
             }
             
-            //向上滑动半屏
-            ui.run(() => { w.text.setText('向上滑动半屏'); });
-            swipe(device.width / 2, device.height/2, device.width / 2, 0, 1000);
+            if(i<upSwipeCount-1){
+                //向上滑动半屏
+                ui.run(() => { w.text.setText('向上滑动半屏'); });
+                swipe(device.width / 2, device.height/2, device.width / 2, device.height/10, 1000);
+                sleep(1000)
+            }
         }
         
         ui.run(() => { w.text.setText('关闭【领饲料】'); });
@@ -729,19 +800,12 @@ function manor_home(){
     closeDialog(true)
     
     ui.run(() => { w.text.setText('检查并点击【庄园-家庭-签到】'); });
-    var btn = common.clickImg('庄园-家庭-签到.jpg', {waitDisplayTimeout:1000, threshold:0.8});
+    var btn = common.clickImg('庄园-家庭-签到.jpg', {waitDisplayTimeout:3000, threshold:0.8});
     if(btn) sleep(3000);
     
     back(); sleep(3000);
 }
 function manor_answer(){
-    ui.run(() => { w.text.setText('检查【去答题】'); });
-    var btn = text('去答题').findOnce();
-    if(!btn) return;
-    if(!common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()})) return;
-    
-    ui.run(() => { w.text.setText('点击【去答题】'); });
-    common.clickIfParent(btn);
     var btn = textMatches(/题目来源.*/).findOne(5000);
     if(!btn) throw new Error('超时未打开【去答题】');
     
@@ -750,23 +814,11 @@ function manor_answer(){
     btn.parent().find(className('android.widget.TextView')).forEach((t) => {
         press(t.bounds().centerX(), t.bounds().centerY(), 1)
     })
+    sleep(2000)
     
-    back(); sleep(3000)
-    
-    manor_receive()
+    back(); sleep(2000)
 }
-
 function manor_hire(){
-    ui.run(() => { w.text.setText('检查【雇佣小鸡】'); });
-    var btn = text('雇佣小鸡拿饲料').findOnce();
-    if(!btn) return;
-    if(!common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()})) return;
-    
-    var btn = btn.parent().findOne(text('去完成'));
-    if(!btn) return;
-    ui.run(() => { w.text.setText('点击【雇佣小鸡】的【去完成】'); });
-    common.clickIfParent(btn); sleep(1000);
-    
     var btn = textMatches(/^(雇佣|雇佣并通知)$/).findOne(5000);
     if(!btn) throw new Error('超时未打开雇佣小鸡的【去完成】');
     
@@ -776,132 +828,20 @@ function manor_hire(){
     if(btn) common.clickIfParent(btn); sleep(1000);
     
     back(); sleep(2000)
-    
-    manor_receive()
 }
-
 function manor_video(){
-    ui.run(() => { w.text.setText('检查【庄园小视频】'); });
-    var btn = text('庄园小视频').findOnce();
-    if(!btn) return;
-    if(!common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()})) return;
-    
-    var btn = btn.parent().findOne(text('去完成'));
-    if(!btn) return;
-    ui.run(() => { w.text.setText('点击【庄园小视频】的【去完成】'); });
-    common.clickIfParent(btn);
-    
-    sleep(20000);
-    
-    back(); sleep(2000)
-    
-    manor_receive()
-    
-    return true;
+    sleep(20000)
 }
-
-function manor_grocery(){
-    ui.run(() => { w.text.setText('检查【去杂货铺逛一逛】'); });
-    var btn = text('去杂货铺逛一逛').findOnce();
-    if(!btn) return;
-    if(!common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()})) return;
-    
-    var btn = btn.parent().findOne(text('去完成'));
-    if(!btn) return;
-    ui.run(() => { w.text.setText('点击【去杂货铺逛一逛】的【去完成】'); });
-    common.clickIfParent(btn);
-    
-    browser_ad();
-    
-    manor_receive()
+function manor_simple(){
+    sleep(2000)
 }
-
-var ManorSimpleCount = {};
-/**
- * 蚂蚁庄园里简单的点进去后再回退就能完成的任务
- */
-function manor_simple(jobTitlePattern, jobEnterBtnText){
-    if((ManorSimpleCount[jobTitlePattern]||0) > 2) return;
-    
-    ui.run(() => { w.text.setText('检查【'+jobTitlePattern+'】'); });
-    var btn = textMatches(jobTitlePattern).findOnce();
-    if(!btn) return;
-    if(!common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()})) return;
-    
-    var btn = btn.parent().findOne(text(jobEnterBtnText));
-    if(!btn) return;
-    ui.run(() => { w.text.setText('点击【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】'); });
-    common.clickIfParent(btn); sleep(5000)
-    
-    ui.run(() => { w.text.setText('后退 返回庄园'); });
-    for(var i=0;i<3;i++){
-        if(textMatches(jobTitlePattern).findOnce()!=null) break;
-        back(); sleep(3000);
-    }
-    
-    manor_receive()
-    
-    ManorSimpleCount[jobTitlePattern] = (ManorSimpleCount[jobTitlePattern]||0) + 1;
-    return true;
-}
-
-var ManorIntentCount = {};
-/**
- * 蚂蚁庄园里简单的跳到另一个app后再回退就能完成的任务
- */
-function manor_intent(jobTitlePattern, jobEnterBtnText){
-    if((ManorIntentCount[jobTitlePattern]||0) > 2) return;
-    common.log('检查【'+jobTitlePattern+'】'); ui.run(() => { w.text.setText('检查【'+jobTitlePattern+'】'); });
-    var btn = textMatches(jobTitlePattern).findOnce();
-    if(!btn){
-        common.log('未找到【' + jobTitlePattern + '】');
-        return;
-    }
-    var visible = common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()});
-    common.log('找到【'+jobTitlePattern+'】，坐标', btn.bounds(), '是否可见', visible);
-    if(!visible) return;
-    
-    common.log('检查【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】'); ui.run(() => { w.text.setText('检查【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】'); });
-    var btn = btn.parent().findOne(text(jobEnterBtnText));
-    if(!btn){
-        common.log('未找到【' + jobTitlePattern + '】的【' + jobEnterBtnText + '】');
-        return;
-    }
-    var visible = common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()});
-    common.log('找到【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】，坐标', btn.bounds(), '是否可见', visible);
-    ui.run(() => { w.text.setText('点击【'+jobTitlePattern+'】的【'+jobEnterBtnText+'】'); });
-    common.clickIfParent(btn); sleep(10000);
-    
+function manor_intent(){
+    sleep(7000)
     common.log('回到支付宝')
-    launch('com.eg.android.AlipayGphone'); sleep(2000)
-    
-    common.log('开始后退 返回庄园'); ui.run(() => { w.text.setText('后退 返回庄园'); });
-    for(var i=0;i<3;i++){
-        if(textMatches(jobTitlePattern).findOnce()!=null){
-            common.log('找到【'+jobTitlePattern+'】已返回庄园');
-            break;
-        }
-        common.log('未找到【'+jobTitlePattern+'】，执行后退键');
-        back(); sleep(3000);
-    }
-    
-    manor_receive()
-    
-    ManorIntentCount[jobTitlePattern] = (ManorIntentCount[jobTitlePattern]||0) + 1;
-    return true;
+    launch('com.eg.android.AlipayGphone'); sleep(3000)
 }
 
 function manor_kitchen(){
-    ui.run(() => { w.text.setText('检查【小鸡厨房】'); });
-    var btn = text('小鸡厨房').findOnce();
-    if(!btn) return;
-    if(!common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()})) return;
-    
-    var btn = btn.parent().findOne(text('去完成'));
-    if(!btn) return;
-    ui.run(() => { w.text.setText('点击【小鸡厨房】的【去完成】'); });
-    common.clickIfParent(btn);
-    
     ui.run(() => { w.text.setText('检查并点击【领取食材】'); });
     common.clickImg('庄园-厨房-领取食材.jpg', {waitDisplayTimeout:5000}); sleep(500)
     ui.run(() => { w.text.setText('检查并点击【领取今日食材】'); });
@@ -932,40 +872,10 @@ function manor_kitchen(){
         if(isExhausted) break;
     }
     
-    ui.run(() => { w.text.setText('后退 返回庄园'); });
-    for(var i=0;i<3;i++){
-        if(text('小鸡厨房').findOnce()!=null) break;
-        back(); sleep(3000);
-    }
-    
-    manor_receive()
+    back(); sleep(2000);
 }
 
 function manor_lottery(){
-    common.log('检查【抽抽乐】');
-    ui.run(() => { w.text.setText('检查【抽抽乐】'); });
-    var btn = textMatches(/.*【抽抽乐】.*/).findOnce();
-    if(!btn) {
-        common.log('未找到【抽抽乐】');
-        return;
-    }
-    var visible = common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()});
-    common.log('找到【抽抽乐】，坐标', btn.bounds(), '是否可见', visible);
-    if(!visible) return;
-    
-    common.log('检查【抽抽乐】的【去完成】按钮');
-    var btn = btn.parent().findOne(text('去完成'));
-    if(!btn) {
-        common.log('未找到【抽抽乐】的【去完成】按钮');
-        return;
-    }
-    var visible = common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()});
-    common.log('找到【抽抽乐】的【去完成】按钮，坐标', btn.bounds(), '是否可见', visible);
-    if(!visible) return;
-    common.log('点击【抽抽乐】的【去完成】');
-    ui.run(() => { w.text.setText('点击【抽抽乐】的【去完成】'); });
-    common.clickIfParent(btn);
-    
     common.log('等待【抽抽乐】打开=检查【还剩.*次机会】');
     var btn = textMatches(/.*活动截止时间.*/).findOne(5000); sleep(1000)
     if(!btn) throw new Error('超时未打开【抽抽乐】');
@@ -1091,21 +1001,6 @@ function manor_lottery(){
     }else{
         common.log('未找到【还剩.*次机会】');
     }
-    
-    common.log('开始返回庄园')
-    ui.run(() => { w.text.setText('后退 返回庄园'); });
-    for(var i=0;i<3;i++){
-        if(textMatches(/.*【抽抽乐】.*/).findOnce()!=null){
-            common.log('找到【抽抽乐】，已回到庄园');
-            break;
-        }
-        common.log('未找到【抽抽乐】，后退');
-        back(); sleep(3000);
-    }
-    
-    manor_receive()
-    
-    return true;
 }
 
 function manor_diary(){
@@ -1123,6 +1018,7 @@ function manor_diary(){
     var point = common.clickImg('庄园-小鸡日记-贴贴小鸡.jpg', {waitDisplayTimeout:5000});
     if (!point) {
         common.log('未找到【小鸡日记】的【贴贴小鸡】');
+        back(); sleep(2000);
         return;
     }
     common.log('找到并点击【小鸡日记】的【贴贴小鸡】，坐标', point);
@@ -1170,22 +1066,49 @@ function manor_help(){
 
 /**
  * 领取饲料
+ * @return true：找到领取且成功领取饲料；false：未找到领取或有领取但饲料袋已满无法领取
  */
 function manor_receive(){
-    ui.run(() => { w.text.setText('检查可领取饲料'); });
-    var btn = textMatches(/x(180|120|90|30)g领取/).findOnce();
-    if (btn) {
-        ui.run(() => { w.text.setText('点击饲料领取'); });
-        common.clickIfParent(btn); sleep(1000);
+    function food_full_dialog(){
         ui.run(() => { w.text.setText('检查饲料袋是否已满弹窗'); });
         var btn = text('饲料袋快满了').findOnce();
         if(btn){ common.log('饲料袋快满了')
             var btn = btn.parent().parent().parent().findOne(className('android.widget.Image'));
             if(btn){
-                ui.run(() => { w.text.setText('关闭饲料袋已满弹窗'); });
+                ui.run(() => { w.text.setText('关闭饲料袋快满弹窗'); });
                 common.log('饲料袋快满了 关闭')
                 common.clickIfParent(btn); sleep(1000);
+                return false;
             }
+            throw new Error('未找到关闭饲料袋已满弹窗的按钮');
+        }
+        var btn = text('饲料袋已满').findOnce();
+        if(btn){ common.log('饲料袋已满')
+            var btn = text('知道了').findOnce();
+            if (btn) {
+                ui.run(() => { w.text.setText('关闭饲料袋已满弹窗'); });
+                common.log('饲料袋已满 关闭')
+                common.clickIfParent(btn); sleep(1000);
+                return false;
+            }
+        }
+        return true;
+    }
+    var ocrMode = true;
+    if(ocrMode){
+        common.log('检查【领取】'); ui.run(() => { w.text.setText('检查【领取】'); });
+        var btn = common.clickOcr('领取', {doClick:true,threshold:0.8,textPreProcess:(str)=>str.replace(/[^\w\u4e00-\u9fa5]/g, '')});
+        if(btn){
+            sleep(2000)
+            return food_full_dialog();
+        }
+    }else{
+        ui.run(() => { w.text.setText('检查可领取饲料'); });
+        var btn = textMatches(/x(180|120|90|30)g领取/).findOnce();
+        if (btn) {
+            ui.run(() => { w.text.setText('点击饲料领取'); });
+            common.clickIfParent(btn); sleep(1000);
+            return food_full_dialog();
         }
     }
 }
@@ -1341,7 +1264,7 @@ function taobaoFarm_answer(){
 }
 
 function taobaoFarm_browser(){
-    var pattern = /.*(严选推荐商|一搜你喜欢的商|精选好|一搜你心仪的宝|浏览最高.*00|浏览15秒得).*/
+    var pattern = /.*(严选推荐商|一搜你喜欢的商|精选好|一搜你心仪的宝|浏览最高.*00|浏览15秒|浏览15s).*/
     common.log('检查'+pattern); ui.run(() => { w.text.setText('检查'+pattern); });
     //var btn = common.clickOcr(pattern, {doClick:false,threshold:0.8,offset:{x:0,y:0}});
     var btn = textMatches(pattern).findOnce();
@@ -1349,15 +1272,12 @@ function taobaoFarm_browser(){
         common.log('未找到'+pattern);
         return;
     }
-    common.log('找到', pattern, '，坐标', btn);
+    common.log('找到', btn.text(), '，坐标', btn);
     
     var btnPattern = /.*(去完成|去浏览).*/
     common.log('检查'+pattern+'的'+btnPattern); ui.run(() => { w.text.setText('检查'+btnPattern); });
-    //var region = [btn.x,btn.y,device.width,200];
     var region = [btn.bounds().left,btn.bounds().top,device.width,200];
-    //if(btn.text().match(/.*(浏览最高.*300|浏览15秒.*300).*/)) region[1] = btn.y-100;
-    if(btn.text().match(/.*(浏览最高.*00|浏览15秒得).*/)) region[1] = btn.bounds().top-100;
-    //var btn = common.clickOcr(btnPattern, {doClick:true,threshold:0.8,region:region});
+    if(btn.text().match(/.*(浏览最高.*00|浏览15秒|浏览15s).*/)) region[1] = btn.bounds().top-100;
     var btn = textMatches(btnPattern).boundsInside(region[0],region[1],region[0]+region[2],region[1]+region[3]).findOnce();
     if (!btn) {
         common.log('未找到'+btnPattern);
@@ -1410,12 +1330,95 @@ function taobaoFarm_intend(pattern, btnPattern){
 }
 
 //==================================================================================================公共函数
+var TaskCount = {};
+/**
+ * 横条形任务相关（基于native实现），可用于：
+ * 1.检查横条形任务是否存在（无论是否已做完）
+ * 2.进入横条形任务
+ */
+function task_native(opts){
+    
+}
+/**
+ * 横条形任务相关（基于ocr实现），可用于：
+ * 1.检查横条形任务是否存在（无论是否已做完）
+ * 2.进入横条形任务
+ * @param {Object} opts
+ * <pre>{
+ *   title: 标题
+ *   maxCount: 最大进入次数，默认2
+ *   titleThreshold：标题相似度阈值，默认0.6
+ *   isSubTitle: title参数是否是横条任务的子标题，默认false
+ *   enterBtnText: 进入任务的按钮的文案，默认：['去完成','逛一逛','去逛逛']
+ *   enterBtnTextThreshold: 类似titleThreshold，默认0.6
+ *   screenOcrRsts: 复用的屏幕ocr结果缓存，为null时重新截图识别
+ *   run: 进入任务后执行的逻辑，null为不执行任何逻辑；进入任务前会sleep 3秒，若调起任务需要的sleep时间不够，在run中补齐
+ * }</pre>
+ * @return null:未找到标题或找到标题但未找到进入任务按钮;true:找到标题且成功点击进入任务按钮
+ */
+function task_basic_ocr(opts){
+    var title = opts.title;
+    opts.titleThreshold = opts.titleThreshold || 0.6;
+    opts.enterBtnTextThreshold = opts.enterBtnTextThreshold || 0.6;
+    var maxCount = opts.maxCount || 2;
+    
+    if((TaskCount[title]||0) > maxCount) return;
+    
+    common.log('检查【'+title+'】'); ui.run(() => { w.text.setText('检查【'+title+'】'); });
+    var titleBtn = common.clickOcr(title, {doClick:false,screenOcrRsts:opts.screenOcrRsts,threshold:opts.titleThreshold,textPreProcess:(str)=>str.replace(/[^\w\u4e00-\u9fa5]/g, '')});
+    if(!titleBtn) return;
+    
+    common.log('找到【'+title+'】', titleBtn, '检查进入按钮');
+    var enterBtnText = opts.enterBtnText || ['去完成','逛一逛','去逛逛'];
+    if(typeof enterBtnText == 'string') enterBtnText = [enterBtnText];
+    
+    var EnterBtnFindRegion = [titleBtn.bounds.right, titleBtn.bounds.top, device.width-titleBtn.bounds.right, titleBtn.bounds.height*4];
+    if(opts.isSubTitle){
+        EnterBtnFindRegion[1] = titleBtn.bounds.top-titleBtn.bounds.height;
+    }
+    var enterBtnFindRegionScreenOcrRsts;
+    if(opts.screenOcrRsts){
+        enterBtnFindRegionScreenOcrRsts = [];
+        opts.screenOcrRsts.forEach(function(ocrRst){
+            if(ocrRst.bounds.left<EnterBtnFindRegion[0]) return;
+            if(ocrRst.bounds.top<EnterBtnFindRegion[1]) return;
+            if(ocrRst.bounds.right>device.width) return;
+            if(ocrRst.bounds.bottom>EnterBtnFindRegion[1]+EnterBtnFindRegion[3]) return;
+            enterBtnFindRegionScreenOcrRsts.push(ocrRst);
+        });
+    }
+    var enterBtn = common.clickOcr(enterBtnText, {doClick:false,screenOcrRsts:enterBtnFindRegionScreenOcrRsts,threshold:opts.enterBtnTextThreshold,textPreProcess:(str)=>str.replace(/[^\w\u4e00-\u9fa5]/g, '')});
+    if(!enterBtn) return;
+    common.log('找到并点击【'+title+'】的进入', enterBtn);
+    //任务结束返回时，用标题对应的图片来判断是否已返回。因为有些任务的中间页也有与标题文字高度相关的文字，所以不能只用标题文字来判断
+    var titleImg = images.clip(common.captureScreenx(), titleBtn.bounds.left, titleBtn.bounds.top, titleBtn.bounds.width, titleBtn.bounds.height);
+    press(enterBtn.x, enterBtn.y, 1); sleep(3000);
+    
+    if(opts.run) opts.run();
+    
+    common.log('开始返回'); ui.run(() => { w.text.setText('后退 开始返回'); });
+    opts.screenOcrRsts = null;
+    for(var i=0;i<3;i++){
+        if(images.findImage(common.captureScreenx(), titleImg, { threshold: 0.9 })){
+            common.log('找到【'+title+'】已返回');
+            break;
+        }
+        common.log('点击返回键');
+        back(); sleep(3000);
+        if(i==2) throw new Error('未能返回到【'+title+'】');
+    }
+    
+    TaskCount[title] = (TaskCount[title]||0) + 1;
+    
+    return true;
+}
+
 /**
  * 浏览15s/30s广告，浏览完成后返回
  */
 function browser_ad(){
     common.log('检查是否已打开广告页');
-    var btn = textMatches(/.*(得肥料|一起逛街咯|浏览或查看商品|搜索有福利|猜你想搜|滑动浏览得|拖动下方滑块|浏览15秒).*/).findOne(5000);
+    var btn = textMatches(/.*(得肥料|一起逛街咯|浏览或查看商品|搜索有福利|猜你想搜|滑动浏览得|拖动下方滑块|浏览得奖励|浏览15秒).*/).findOne(5000);
     if(!btn) throw new Error('超时未打开广告页');
     common.log('已打开广告页');
     var markText = btn.text();
@@ -1602,8 +1605,11 @@ function manor_play_ad(){
     sleep(1000)
     
     function findAdBtn(){
-        var btn = common.clickImg(['庄园-乐园-广告-轮盘抽奖.jpg','庄园-乐园-广告-体力商店.jpg','庄园-乐园-广告-双份物品.jpg',
-            '庄园-乐园-广告-钻石商城.jpg','庄园-乐园-广告-在线奖励.jpg'], {threshold:0.9});
+        var btn = common.clickImg(['庄园-乐园-广告-钻石商城-大钻石.jpg','庄园-乐园-广告-钻石商城-体力块.jpg','庄园-乐园-广告-钻石商城-体力箱.jpg'
+            ,'庄园-乐园-广告-在线奖励-小加速.jpg','庄园-乐园-广告-在线奖励-大加速.jpg','庄园-乐园-广告-在线奖励-小礼盒.jpg','庄园-乐园-广告-在线奖励-三选骰.jpg'], {threshold:0.9,offset:{y:-1}})
+            ||
+            common.clickImg(['庄园-乐园-广告-钻石商城.jpg','庄园-乐园-广告-轮盘抽奖.jpg','庄园-乐园-广告-体力商店.jpg','庄园-乐园-广告-双份物品.jpg'
+            ,'庄园-乐园-广告-在线奖励.jpg'], {threshold:0.9});
         if(!btn) return;
         common.log('找到【广告】，坐标', btn); ui.run(() => { w.text.setText('找到【广告】'); });
         sleep(2000)
@@ -1634,6 +1640,8 @@ function manor_play_ad(){
     
     function browserAd(){
         function clickClose(){
+            swipe(device.width / 2, device.height/10, device.width / 2, 0, 500); //关闭前老遇到通知，上划一下干掉它
+            
             common.log('查找【关闭】'); ui.run(() => { w.text.setText('查找【关闭】'); });
             var btn = textMatches('关闭').boundsInside(device.width*2/3,0,device.width,device.height/3).findOnce();
             if(btn){
@@ -1641,7 +1649,7 @@ function manor_play_ad(){
                 common.clickIfParent(btn);sleep(2000);
                 return btn;
             }
-            btn = common.clickOcr(/.*关闭.*/, {doClick:false,threshold:0.8, region:[device.width*2/3,0,device.width/3,device.height/3]});
+            btn = common.clickOcr('关闭', {doClick:false,threshold:0.8, region:[device.width*2/3,0,device.width/3,device.height/3]});
             if (btn) {
                 common.log('找到【关闭】', btn); ui.run(() => { w.text.setText('找到并点击【关闭】'); });
                 press(btn.x, btn.y, 1); sleep(2000);
@@ -1651,7 +1659,7 @@ function manor_play_ad(){
         
         common.log('查找【浏览广告】'); ui.run(() => { w.text.setText('查找【浏览广告】'); });
         var adPattern = /.*(浏览广告.*秒后可领奖励|.*秒可领奖励).*/;
-        var btn = common.clickOcr(adPattern, {doClick:false,threshold:0.8,waitDisplayTimeout:3000,gap:1000});
+        var btn = common.clickOcr(adPattern, {doClick:false,threshold:0.8,waitDisplayTimeout:3000,gap:1000,region:[0,0,device.width,device.height/10]});
         if(!btn){
             common.log('未找到【浏览广告】'); ui.run(() => { w.text.setText('未找到【浏览广告】'); });
             common.log('检查是否是分享给好友'); ui.run(() => { w.text.setText('检查是否是分享给好友'); });
@@ -1680,14 +1688,15 @@ function manor_play_ad(){
             }
         }
         common.log('找到【浏览广告】，坐标', btn); ui.run(() => { w.text.setText('找到【浏览广告】'); });
-        for(var i=0;i<30 && btn;i++){
-            ui.run(() => { w.text.setText('浏览广告'+i+'/30'); });
+        var remainSeconds = parseInt(btn.text.match(/([0-9]+)秒.*/)[1])-1;
+        common.log('剩余', remainSeconds, '秒'); ui.run(() => { w.text.setText('剩余'+remainSeconds+'秒'); });
+        for(var i=0;i<remainSeconds && btn;i++){
+            ui.run(() => { w.text.setText('浏览广告'+(remainSeconds-i)); });
             swipe(device.width / 2, device.height/2, device.width / 2, device.height/2-100, 500);
             sleep(500);
-            i++; ui.run(() => { w.text.setText('浏览广告'+i+'/30'); });
+            i++; ui.run(() => { w.text.setText('浏览广告'+(remainSeconds-i)); });
             swipe(device.width / 2, device.height/2, device.width / 2, device.height/2+100, 500);
             sleep(500);
-            btn = common.clickOcr(adPattern, {doClick:false,threshold:0.8});
         }
         btn = clickClose();
         if(!btn){
@@ -1720,6 +1729,9 @@ function manor_play_ad(){
         if(adBtn && adBtn.isDraw){
             common.log('【抽奖】类型，等待5秒'); ui.run(() => { w.text.setText('【抽奖】类型，等待5秒'); });
             sleep(5000);
+            timestamp = common.timestampFormat(new Date().getTime()).replace(/:/g, '-').replace(/ /g, '_');
+            files.create(MediaDir + "乐园抽奖/");
+            images.save(common.captureScreenx(), MediaDir + '乐园抽奖/' + timestamp + '.png');
         }
         clickConfirm();
         if(adBtn && adBtn.isStamina){

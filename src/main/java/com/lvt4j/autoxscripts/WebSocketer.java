@@ -1,11 +1,15 @@
 package com.lvt4j.autoxscripts;
+import java.io.File;
 import java.net.URLDecoder;
+import java.nio.charset.Charset;
+import java.util.Base64;
 import java.util.Map;
 import java.util.Timer;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -22,6 +26,8 @@ import lombok.SneakyThrows;
 @Configuration
 public class WebSocketer extends TextWebSocketHandler implements WebSocketConfigurer{
 
+    private static final File CaptureScreenFolder = new File("captureScreen");
+    
     private static final long HeartbeatTimeout = 3000;
     
     private static Map<String, SessionMeta> Sessions = new java.util.concurrent.ConcurrentHashMap<>();
@@ -29,7 +35,9 @@ public class WebSocketer extends TextWebSocketHandler implements WebSocketConfig
     private Timer timer = new Timer();
     
     @PostConstruct
-    private void init(){
+    private void init() throws Exception {
+        CaptureScreenFolder.mkdirs();
+        FileUtils.cleanDirectory(CaptureScreenFolder);
         timer.scheduleAtFixedRate(new java.util.TimerTask(){
             public void run(){
                 heartbeat();
@@ -61,6 +69,7 @@ public class WebSocketer extends TextWebSocketHandler implements WebSocketConfig
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception{
+        session.setTextMessageSizeLimit(10*1024*1024);
         String id = id(session);
         if(StringUtils.isBlank(id)) {
             Window.console("非法客户端连接请求");
@@ -117,6 +126,26 @@ public class WebSocketer extends TextWebSocketHandler implements WebSocketConfig
             if(meta!=null) meta.lastHeartbeat = System.currentTimeMillis();
             return;
         }
+        if(message.getPayload().startsWith("_screen:")){
+            String[] parts = message.getPayload().split(":",3);
+            if(parts.length==3){
+                Window.console("上报截图：" + parts[1]);
+                File screenFile = new File(CaptureScreenFolder, parts[1]);
+                byte[] imgData = Base64.getDecoder().decode(parts[2]);
+                FileUtils.writeByteArrayToFile(screenFile, imgData);
+                return;
+            }
+        }
+        if(message.getPayload().startsWith("_ocr:")) {
+            String[] parts = message.getPayload().split(":",3);
+            if(parts.length==3){
+                Window.console("上报OCR：" + parts[1]);
+                File ocrFile = new File(CaptureScreenFolder, parts[1]);
+                FileUtils.writeStringToFile(ocrFile, parts[2], Charset.defaultCharset());
+                return;
+            }
+        }
+        
         Window.mobileConsole(id, message.getPayload());
     }
     

@@ -1,6 +1,8 @@
 auto.waitFor();
 var common = require('./common.js')
 
+common.setCaptureScreenLandscape();
+
 setInterval(function(){}, 1000);
 
 function stopEnginesExceptThis() {
