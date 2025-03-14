@@ -24,6 +24,7 @@ applicationPid
 /test/
 /logs/
 *.log
+/captureScreen/
 NOA打卡.js
 /debugger.conf
 /debug_server_conf.json

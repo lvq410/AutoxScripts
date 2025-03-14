@@ -94,20 +94,28 @@ w.manorPlayAdBtn.click(() => {doRun(manor_play_ad)});
 function main(){
     sleep(1000)
     
-    var msg = forest();
-    if(msg) return msg;
+    function tryTwice(func){
+        try{
+            func();
+        }catch(e){
+            ui.run(() => {
+                w.text.setText('脚本异常：'+e.message);
+            });
+            common.log(e.message, e);
+            func();
+        }
+    }
+    
+    tryTwice(forest);
     sleep(1000);
     
-    var msg = farm();
-    if(msg) return msg;
+    tryTwice(farm);
     sleep(1000);
     
-    var msg = manor();
-    if(msg) return msg;
+    tryTwice(manor);
     sleep(1000);
     
-    var msg = taobaoFarm();
-    if(msg) return msg;
+    tryTwice(taobaoFarm);
 }
 
 //==================================================================================================蚂蚁森林
@@ -119,23 +127,28 @@ function forest(){
     
     ui.run(() => { w.text.setText('等待并点击【蚂蚁森林】'); });
     var btn = text('蚂蚁森林').findOne(5000);
-    if(!btn) return '未找到【蚂蚁森林】';
+    if(!btn) throw new Error('未找到【蚂蚁森林】');
     common.clickIfParent(btn); sleep(3000)
     
-    closeDialog(true)
     ui.run(() => { w.text.setText('等待【蚂蚁森林】打开'); });
-    var btn = text('去保护').findOne(5000);
+    var btn;
+    for(var i=0;i<10;i++){
+        btn = textMatches(/^(去保护|去种植)$/).findOnce();
+        if(btn) break;
+        else closeDialog()
+        sleep(1000);
+    }
     if(btn) sleep(2000);
-    else return '超时未打开【蚂蚁森林】';
+    else throw new Error('超时未打开【蚂蚁森林】');
     
     forest_fallenLeaves();
     
     ui.run(() => { w.text.setText('收个人能量'); });
-    var btn = id('J_pop_treedialog_close').findOnce();
+    var btn = selector().idMatches('J_pop_treedialog_close').findOnce();
     if(btn) common.clickIfParent(btn);
     press((525/1080)*device.width, (900/2448)*device.height,1);
     
-    var btn = id('J_pop_treedialog_close').findOne(3000);
+    var btn = selector().idMatches('J_pop_treedialog_close').findOne(3000);
     if(btn) {common.clickIfParent(btn); sleep(3000);}
     
     for(var y = (700/2448)*device.height; y< (870/2448)*device.height; y+=50){
@@ -145,7 +158,7 @@ function forest(){
     }
 
     var msg = forest_findEnergy();
-    if(msg) return msg;
+    if(msg) throw new Error(msg);
     
     var btn = text('天天能量雨还可收取').findOnce();
     if(btn){
@@ -199,36 +212,8 @@ function forest_fallenLeaves(){
         }
     }
     
-    common.log('检查【连续收7天自己能量】'); ui.run(() => { w.text.setText('检查并点击【连续收7天自己能量】'); });
-    var  btn = text('连续收7天自己能量').findOnce();
-    if(btn){
-        common.log('找到【连续收7天自己能量】，检查其【立即领取】');
-        var btn = btn.parent().parent().findOne(text('立即领取'));
-        if(btn){
-            common.log('找到并点击【连续收7天自己能量】的【立即领取】', btn.bounds());
-            common.clickIfParent(btn); sleep(2000);
-            
-        }else{
-            common.log('未找到【连续收7天自己能量】的【立即领取】');
-        }
-    }
-    
-    common.log('检查【领取能量双击卡】'); ui.run(() => { w.text.setText('检查并点击【领取能量双击卡】'); });
-    var  btn = text('领取能量双击卡').findOnce();
-    if(btn){
-        common.log('找到【领取能量双击卡】，检查其【立即领取】');
-        var btn = btn.parent().parent().findOne(text('立即领取'));
-        if(btn){
-            common.log('找到并点击【领取能量双击卡】的【立即领取】', btn.bounds());
-            common.clickIfParent(btn); sleep(2000);
-            
-        }else{
-            common.log('未找到【领取能量双击卡】的【立即领取】');
-        }
-    }
-    
     common.log('检查【收落叶】'); ui.run(() => { w.text.setText('检查并点击【收落叶】的【去转化】'); });
-    var  btn = textMatches(/.*收落叶转化农场肥料.*/).findOnce();
+    var btn = textMatches(/.*收落叶转化农场肥料.*/).findOnce();
     if(btn) {
         common.log('找到【收落叶】，检查其【去转化】');
         var btn = btn.parent().findOne(text('去转化'));
@@ -265,6 +250,37 @@ function forest_fallenLeaves(){
         }
     }else{
         common.log('未找到【收落叶】');
+    }
+    
+    for(var i=0;i<3;i++){
+        swipe(device.width / 2, device.height/2, device.width / 2, device.height/10, 1000);
+        common.log('检查【连续收7天自己能量】'); ui.run(() => { w.text.setText('检查并点击【连续收7天自己能量】'); });
+        var  btn = textMatches(/^连续.*7天.*自己能量.*/).findOnce();
+        if(btn){
+            common.log('找到【连续收7天自己能量】，检查其【立即领取】');
+            var btn = btn.parent().findOne(text('立即领取'));
+            if(btn){
+                common.log('找到并点击【连续收7天自己能量】的【立即领取】', btn.bounds());
+                common.clickIfParent(btn); sleep(2000);
+                
+            }else{
+                common.log('未找到【连续收7天自己能量】的【立即领取】');
+            }
+        }
+        
+        common.log('检查【领取能量双击卡】'); ui.run(() => { w.text.setText('检查并点击【领取能量双击卡】'); });
+        var  btn = text('领取能量双击卡').findOnce();
+        if(btn){
+            common.log('找到【领取能量双击卡】，检查其【立即领取】');
+            var btn = btn.parent().parent().findOne(text('立即领取'));
+            if(btn){
+                common.log('找到并点击【领取能量双击卡】的【立即领取】', btn.bounds());
+                common.clickIfParent(btn); sleep(2000);
+                
+            }else{
+                common.log('未找到【领取能量双击卡】的【立即领取】');
+            }
+        }
     }
     
     common.log('检查【活力值奖励】弹窗的关闭按钮')
@@ -353,13 +369,13 @@ function farm(){
     
     ui.run(() => { w.text.setText('等待并点击【芭芭农场】'); });
     var btn = text('芭芭农场').findOne(5000);
-    if(!btn) return '未找到【芭芭农场】';
+    if(!btn) throw new Error('未找到【芭芭农场】');
     common.clickIfParent(btn);
     
     ui.run(() => { w.text.setText('等待【芭芭农场】打开'); });
     var btn = text('任务列表').findOne(5000);
     if(btn) sleep(2000)
-    else return '超时未打开【芭芭农场】';
+    else throw new Error('超时未打开【芭芭农场】');
     closeDialog()
     
     common.log('检查【点击领取】'); ui.run(() => { w.text.setText('检查【点击领取】'); });
@@ -379,7 +395,7 @@ function farm(){
         if(btn){
             common.clickIfParent(btn); sleep(3000);
             common.clickImg('农场-施肥小奖-立即领取.jpg'); sleep(3000);
-            var btn = textMatches(/.*点.*逛一逛再得.*肥料.*/).findOnce();
+            var btn = textMatches(/.*点.*逛一逛再(得|赚).*肥料.*/).findOnce();
             if(btn){
                 common.clickIfParent(btn); sleep(2000);
                 browser_ad();
@@ -391,7 +407,7 @@ function farm(){
     var btn = text('任务列表').findOne(5000);
     common.clickIfParent(btn);
     var btn = textMatches(/今天可领.*肥料/).findOne(5000);
-    if(!btn) return '超时未打开【任务列表】';
+    if(!btn) throw new Error('超时未打开【任务列表】');
     
     var btn = text('领取').findOnce();
     if(btn){
@@ -400,8 +416,7 @@ function farm(){
         common.clickImg('农场-签到确认.jpg');
     }
     
-    farm_browseProducts();
-    farm_browseProducts();
+    farm_browseProducts(); farm_browseProducts(); farm_browseProducts();
     
     farm_manorChickManure();
     
@@ -658,34 +673,38 @@ function manor(){
     
     ui.run(() => { w.text.setText('等待并点击【蚂蚁庄园】'); });
     var btn = text('蚂蚁庄园').findOne(5000);
-    if(!btn) return '未找到【蚂蚁庄园】';
+    if(!btn) throw new Error('未找到【蚂蚁庄园】');
     common.clickIfParent(btn);
     
     ui.run(() => { w.text.setText('等待【蚂蚁庄园】打开'); });
     var point = common.clickImg('庄园-领饲料.jpg', {waitDisplayTimeout:10000,doClick:false});
-    if(!point) return '超时未打开【蚂蚁庄园】';
+    if(!point) throw new Error('超时未打开【蚂蚁庄园】');
     common.log('已找到【庄园-领饲料.jpg】，坐标', point);
     
     var feedBtnPoint = {x:device.width-((150/1080)*device.width), y:point.y};
     common.log('计算出喂养按钮坐标', feedBtnPoint)
     
-    manor_help();
+    //manor_help();
     
     manor_home();
     
-    for(var k=0; k<3; k++){
+    var isFeedbagFull = false;
+    for(var k=0; k<2; k++){
         common.log('点击【领饲料】'); ui.run(() => { w.text.setText('点击【领饲料】'); });
         var point = common.clickImg('庄园-领饲料.jpg', {waitDisappearTimeout:3000,loopClickWhileWaitDisappear:false});
-        if(!point) return '超时未打开【领饲料】】';
+        if(!point) throw new Error('超时未打开【领饲料】】');
         
         var btn = text('x180').findOne(5000);
-        if(!btn) return '超时未打开【领饲料】';
+        if(!btn) throw new Error('超时未打开【领饲料】');
         
-        var upSwipeCount = 3;
+        var upSwipeCount = 2;
         for(var i=0; i<upSwipeCount; i++){
-            for(var ti=0; ti<10; ti++){
-                var taskRst = manor_receive();
-                if(taskRst) continue;
+            while(true){
+                if(!isFeedbagFull){
+                    var receiveRst = manor_receive();
+                    if(receiveRst==1) continue;
+                    if(receiveRst==-1) isFeedbagFull = true;
+                }
                 
                 var screenOcrRsts = paddle.ocr(common.captureScreenx(), 4, false)
                     .filter(ocrRst=>ocrRst.bounds.top>w.getY()+w.getHeight()); //将top小于悬浮窗的ocr结果干掉，防止因为悬浮窗上的提示导致误认
@@ -752,11 +771,9 @@ function manor(){
                 if(taskRst) continue;
                 var taskRst = task_basic_ocr({title:'去快手逛一逛',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
                 if(taskRst) continue;
-                var taskRst = task_basic_ocr({title:'去今日头条极速版逛一逛',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                var taskRst = task_basic_ocr({title:'去今日头条极速版逛一逛',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts,maxCount:1});
                 if(taskRst) continue;
                 var taskRst = task_basic_ocr({title:'逛一逛UC浏览器',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
-                if(taskRst) continue;
-                var taskRst = task_basic_ocr({title:'逛一逛小羊农场',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
                 if(taskRst) continue;
                 
                 break;
@@ -771,8 +788,8 @@ function manor(){
         }
         
         ui.run(() => { w.text.setText('关闭【领饲料】'); });
-        var btn = text('关闭').findOne(5000);
-        if(!btn) return '超时未找到【领饲料】的关闭按钮';
+        var btn = text('关闭饲料任务弹窗').findOne(5000);
+        if(!btn) throw new Error('超时未找到【领饲料】的关闭按钮');
         common.clickIfParent(btn); sleep(2000)
     }
     
@@ -788,22 +805,27 @@ function manor(){
     
     manor_diary();
     
-    manor_help();
+    //manor_help();
 }
 function manor_home(){
-    ui.run(() => { w.text.setText('检查并点击【庄园-家庭】'); });
+    common.log('检查并点击【庄园-家庭】'); ui.run(() => { w.text.setText('检查并点击【庄园-家庭】'); });
     var btn = common.clickImg('庄园-家庭.jpg', {threshold:0.8});
-    if(!btn) return;
+    if(!btn){
+        common.log('未找到【庄园-家庭】');
+        return;
+    }
     
     sleep(5000)
     closeDialog()
     closeDialog(true)
     
-    ui.run(() => { w.text.setText('检查并点击【庄园-家庭-签到】'); });
-    var btn = common.clickImg('庄园-家庭-签到.jpg', {waitDisplayTimeout:3000, threshold:0.8});
+    common.log('检查并点击【庄园-家庭-签到】'); ui.run(() => { w.text.setText('检查并点击【庄园-家庭-签到】'); });
+    var btn = common.clickImg('庄园-家庭-签到.jpg', {waitDisplayTimeout:3000, waitDisappearTimeout:3000, threshold:0.7});
     if(btn) sleep(3000);
     
     back(); sleep(3000);
+    
+    return btn!=null;
 }
 function manor_answer(){
     var btn = textMatches(/题目来源.*/).findOne(5000);
@@ -1066,7 +1088,11 @@ function manor_help(){
 
 /**
  * 领取饲料
- * @return true：找到领取且成功领取饲料；false：未找到领取或有领取但饲料袋已满无法领取
+ * @return <pre>
+ * 0：未找到领取
+ * 1：找到领取且成功领取饲料
+ * -1：饲料袋已满无法领取
+ * </pre>
  */
 function manor_receive(){
     function food_full_dialog(){
@@ -1078,9 +1104,9 @@ function manor_receive(){
                 ui.run(() => { w.text.setText('关闭饲料袋快满弹窗'); });
                 common.log('饲料袋快满了 关闭')
                 common.clickIfParent(btn); sleep(1000);
-                return false;
+                return -1;
             }
-            throw new Error('未找到关闭饲料袋已满弹窗的按钮');
+            throw new Error('未找到关闭饲料袋快满弹窗的按钮');
         }
         var btn = text('饲料袋已满').findOnce();
         if(btn){ common.log('饲料袋已满')
@@ -1089,10 +1115,11 @@ function manor_receive(){
                 ui.run(() => { w.text.setText('关闭饲料袋已满弹窗'); });
                 common.log('饲料袋已满 关闭')
                 common.clickIfParent(btn); sleep(1000);
-                return false;
+                return -1;
             }
+            throw new Error('未找到关闭饲料袋已满弹窗的按钮');
         }
-        return true;
+        return 1;
     }
     var ocrMode = true;
     if(ocrMode){
@@ -1102,6 +1129,7 @@ function manor_receive(){
             sleep(2000)
             return food_full_dialog();
         }
+        return 0;
     }else{
         ui.run(() => { w.text.setText('检查可领取饲料'); });
         var btn = textMatches(/x(180|120|90|30)g领取/).findOnce();
@@ -1110,6 +1138,7 @@ function manor_receive(){
             common.clickIfParent(btn); sleep(1000);
             return food_full_dialog();
         }
+        return 0;
     }
 }
 
@@ -1122,7 +1151,7 @@ function taobaoFarm(){
     
     common.log('等待并点击【芭芭农场】'); ui.run(() => { w.text.setText('等待并点击【芭芭农场】'); });
     var btn = desc('芭芭农场').findOne(10000);
-    if(!btn) return '未找到【芭芭农场】';
+    if(!btn) throw new Error('未找到【芭芭农场】');
     common.log('找到并点击【芭芭农场】，坐标', btn.bounds());
     press(btn.bounds().centerX(), btn.bounds().centerY(), 1); sleep(2000)
     
@@ -1182,14 +1211,14 @@ function taobaoFarm(){
     
     common.log('检查【集肥料】'); ui.run(() => { w.text.setText('检查【集肥料】'); });
     var taskBtn = text('集肥料').findOne(5000);
-    if(!taskBtn) return '超时未打开【芭芭农场】';
+    if(!taskBtn) throw new Error('超时未打开【芭芭农场】');
     common.log('找到【集肥料】，坐标', taskBtn.bounds());
     
     common.log('点击【集肥料】'); ui.run(() => { w.text.setText('点击【集肥料】'); });
     press(taskBtn.bounds().centerX(), taskBtn.bounds().centerY(), 1);
     common.log('检查【集肥料任务列表弹窗】是否已打开'); ui.run(() => { w.text.setText('检查【集肥料任务列表弹窗】是否已打开'); });
     var btn = text('肥料明细').findOne(3000);
-    if(!btn) return '超时未打开【集肥料任务列表弹窗】';
+    if(!btn) throw new Error('超时未打开【集肥料任务列表弹窗】');
     
     common.log('检查【去签到】'); ui.run(() => { w.text.setText('检查【去签到】'); });
     var btn = text('去签到').findOne(2000);
@@ -1362,7 +1391,7 @@ function task_basic_ocr(opts){
     opts.enterBtnTextThreshold = opts.enterBtnTextThreshold || 0.6;
     var maxCount = opts.maxCount || 2;
     
-    if((TaskCount[title]||0) > maxCount) return;
+    if((TaskCount[title]||0) >= maxCount) return;
     
     common.log('检查【'+title+'】'); ui.run(() => { w.text.setText('检查【'+title+'】'); });
     var titleBtn = common.clickOcr(title, {doClick:false,screenOcrRsts:opts.screenOcrRsts,threshold:opts.titleThreshold,textPreProcess:(str)=>str.replace(/[^\w\u4e00-\u9fa5]/g, '')});
@@ -1586,17 +1615,24 @@ function anti_antiBot(){
     }
 }
 
-function closeDialog(dialog){
+function closeDialog(options){
+    options = options||{};
+    var selectParams = textMatches(/^(关闭|关闭按钮)$/).boundsInside(0,device.height*1/5,device.width*2,device.height*2);
+    
     var btn;
-    if(dialog){
-        btn = className('android.app.Dialog').find().findOne(className('android.widget.Button').clickable().textMatches(/^(关闭|关闭按钮)$/));
+    if(options.dialog){
+        btn = className('android.app.Dialog').find().findOne(selectParams);
     }else{
-        btn = text('关闭').findOnce();
+        btn = selectParams.findOnce();
     }
     if(btn){
-        common.clickIfParent(btn);
-        return true;
+        var visible = common.isPointVisible({x:btn.bounds().centerX(), y:btn.bounds().centerY()});
+        if(visible){
+            common.clickIfParent(btn); sleep(2000);
+            return true;
+        }
     }
+    return false;
 }
 
 //==================================================================================================小鸡乐园
@@ -1658,7 +1694,7 @@ function manor_play_ad(){
         }
         
         common.log('查找【浏览广告】'); ui.run(() => { w.text.setText('查找【浏览广告】'); });
-        var adPattern = /.*(浏览广告.*秒后可领奖励|.*秒可领奖励).*/;
+        var adPattern = /.*(浏览广告.*秒后可领奖励|.*秒.*可领奖励).*/;
         var btn = common.clickOcr(adPattern, {doClick:false,threshold:0.8,waitDisplayTimeout:3000,gap:1000,region:[0,0,device.width,device.height/10]});
         if(!btn){
             common.log('未找到【浏览广告】'); ui.run(() => { w.text.setText('未找到【浏览广告】'); });

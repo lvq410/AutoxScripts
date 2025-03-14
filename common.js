@@ -68,12 +68,20 @@ if(files.exists(wsDebugConfFile)){
         websocket_init();
         
         setInterval(()=>{
-            if(WebSocket==null) return;
-            try{
-                WebSocket.send('heartbeat');
-            }catch(ig){}
+            websocket_sendAsync('heartbeat');
         }, 1000);
     }
+}
+
+function websocket_sendAsync(msg){
+    if(WebSocket == null) return;
+    threads.start(()=>{
+        try{
+            WebSocket.send(msg);
+        }catch(e){
+            log('websocket异步发送消息失败', msg.substr(0,200), e.message, e);
+        }
+    });
 }
 
 /**
@@ -331,7 +339,7 @@ var captureScreenx = module.exports.captureScreenx = function() {
         else idx = SaveCaptureScreenIdx[timestamp] = idx + 1;
         var captureScreenFileName = timestamp + '_' + idx + '.png';
         var img64 = images.toBase64(screen);
-        try{if(WebSocket) WebSocket.send('_screen:'+captureScreenFileName+':'+img64);}catch(ig){}
+        websocket_sendAsync('_screen:'+captureScreenFileName+':'+img64);
         common.log('截图', captureScreenFileName);
     }
     if (CaptureScreenLandscape == null) return screen;
@@ -355,7 +363,7 @@ var captureScreenx = module.exports.captureScreenx = function() {
         var idx = SaveCaptureScreenIdx[timestamp];
         var captureScreenFileName = timestamp + '_' + idx + '_调整.png';
         var img64 = images.toBase64(resized);
-        try{if(WebSocket) WebSocket.send('_screen:'+captureScreenFileName+':'+img64);}catch(ig){}
+        websocket_sendAsync('_screen:'+captureScreenFileName+':'+img64);
         common.log('截图调整', captureScreenFileName);
     }
     //经过clip再resize的图片似乎有问题，提取像素，图片查找等函数会报错，将图片保存再读取一次可以避免这个问题
@@ -551,9 +559,9 @@ var clickOcr = module.exports.clickOcr = function(textPattern, options) {
             else idx = SaveCaptureScreenIdx[timestamp] = idx + 1;
             var captureScreenFileName = timestamp + '_' + idx + '.png';
             var img64 = images.toBase64(screen);
-            try{if(WebSocket) WebSocket.send('_screen:'+captureScreenFileName+':'+img64);}catch(ig){}
+            websocket_sendAsync('_screen:'+captureScreenFileName+':'+img64);
             var captureScreenOcrFileName = timestamp + '_' + idx + '.ocr';
-            try{if(WebSocket) WebSocket.send('_ocr:'+captureScreenOcrFileName+':'+JSON.stringify(screenOcrRsts, null, 2));}catch(ig){}
+            websocket_sendAsync('_ocr:'+captureScreenOcrFileName+':'+JSON.stringify(screenOcrRsts, null, 2));
             common.log('ocr截图', captureScreenFileName, 'ocr结果', captureScreenOcrFileName);
         }
         var matches = [];
@@ -762,12 +770,7 @@ module.exports.log = function() {
         msg += arg;
     }
     log(msg)
-    if(!WebSocket) return;
-    try {
-        WebSocket.send(msg);
-    }catch(e){
-        log('websocket发送消息异常', msg, e);
-    }
+    websocket_sendAsync(msg);
 };
 
 /** 编辑距离计算 */
