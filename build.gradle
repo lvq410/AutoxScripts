@@ -61,4 +61,6 @@ dependencies {
     
     compile 'org.springframework.boot:spring-boot-starter-web'
     compile 'org.springframework.boot:spring-boot-starter-websocket'
+    
+    compile 'com.squareup.okhttp3:okhttp:4.12.0'
 }

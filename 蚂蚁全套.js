@@ -133,7 +133,7 @@ function forest(){
     ui.run(() => { w.text.setText('等待【蚂蚁森林】打开'); });
     var btn;
     for(var i=0;i<10;i++){
-        btn = textMatches(/^(去保护|去种植)$/).findOnce();
+        btn = textMatches(/^(去保护|去种植|去参与)$/).findOnce();
         if(btn) break;
         else closeDialog()
         sleep(1000);
@@ -240,7 +240,7 @@ function forest_fallenLeaves(){
             var btn = btn.parent().findOne(text('立即领取'));
             if(btn){
                 common.log('找到【收落叶】的【立即领取】，点击', btn.bounds());
-                common.clickIfParent(btn); sleep(2000);
+                common.clickIfParent(btn); sleep(4000);
             } else {
                 common.log('未找到【收落叶】的【立即领取】');
             }
@@ -261,22 +261,20 @@ function forest_fallenLeaves(){
             var btn = btn.parent().findOne(text('立即领取'));
             if(btn){
                 common.log('找到并点击【连续收7天自己能量】的【立即领取】', btn.bounds());
-                common.clickIfParent(btn); sleep(2000);
-                
+                common.clickIfParent(btn); sleep(3000);
             }else{
                 common.log('未找到【连续收7天自己能量】的【立即领取】');
             }
         }
         
         common.log('检查【领取能量双击卡】'); ui.run(() => { w.text.setText('检查并点击【领取能量双击卡】'); });
-        var  btn = text('领取能量双击卡').findOnce();
+        var  btn = textMatches(/^领取能量双击卡.*/).findOnce();
         if(btn){
             common.log('找到【领取能量双击卡】，检查其【立即领取】');
-            var btn = btn.parent().parent().findOne(text('立即领取'));
+            var btn = btn.parent().findOne(text('立即领取'));
             if(btn){
                 common.log('找到并点击【领取能量双击卡】的【立即领取】', btn.bounds());
-                common.clickIfParent(btn); sleep(2000);
-                
+                common.clickIfParent(btn); sleep(3000);
             }else{
                 common.log('未找到【领取能量双击卡】的【立即领取】');
             }
@@ -440,6 +438,8 @@ function farm(){
             did |= farm_simple(/.*逛.*好货得肥料.*/, /去完成|去逛逛/, {browserAd:true});
             did |= farm_simple(/.*去领取你的商家奖励.*/, /去完成|去逛逛/);
             did |= farm_simple(/.*看10s视频领肥料.*/, /去完成|去逛逛/,{sleep:15000});
+            did |= farm_simple(/.*查看信用卡账单.*/, /去完成|去逛逛/);
+            did |= farm_simple(/.*逛一逛蚂蚁森林.*/, /去完成|去逛逛/);
             
             did |= farm_intent(/.*逛一逛快手.*/, /去完成|去逛逛/);
             did |= farm_intent(/.*逛一逛头条极速版.*/, /去完成|去逛逛/);
@@ -453,6 +453,7 @@ function farm(){
             did |= farm_intent(/.*逛淘宝看视频领现金.*/, /去完成|去逛逛/);
             did |= farm_intent(/.*逛逛美团APP.*/, /去完成|去逛逛/);
             did |= farm_intent(/.*去积攒芝麻粒.*/, /去完成|去逛逛/);
+            did |= farm_intent(/.*去淘宝最高得.*肥料.*/, /去完成|去逛逛/);
         }while(did)
         
         swipe(device.width / 2, device.height/2, device.width / 2, 0, 500);
@@ -775,6 +776,10 @@ function manor(){
                 if(taskRst) continue;
                 var taskRst = task_basic_ocr({title:'逛一逛UC浏览器',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
                 if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'去百度地图逛一逛',enterBtnText:'去完成',run:manor_intent,screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
+                var taskRst = task_basic_ocr({title:'逛一逛小羊农场',enterBtnText:'去完成',run:()=>manor_intent(15000),screenOcrRsts:screenOcrRsts});
+                if(taskRst) continue;
                 
                 break;
             }
@@ -816,8 +821,7 @@ function manor_home(){
     }
     
     sleep(5000)
-    closeDialog()
-    closeDialog(true)
+    closeDialog();
     
     common.log('检查并点击【庄园-家庭-签到】'); ui.run(() => { w.text.setText('检查并点击【庄园-家庭-签到】'); });
     var btn = common.clickImg('庄园-家庭-签到.jpg', {waitDisplayTimeout:3000, waitDisappearTimeout:3000, threshold:0.7});
@@ -857,8 +861,9 @@ function manor_video(){
 function manor_simple(){
     sleep(2000)
 }
-function manor_intent(){
-    sleep(7000)
+function manor_intent(sleeptime){
+    sleeptime = sleeptime||7000;
+    sleep(sleeptime)
     common.log('回到支付宝')
     launch('com.eg.android.AlipayGphone'); sleep(3000)
 }
@@ -1237,7 +1242,7 @@ function taobaoFarm(){
 
     while(taobaoFarm_browser()){};
     
-    taobaoFarm_intend(/.*支付宝芭芭农.*/, /去完成/);
+    taobaoFarm_intend(/.*支付宝芭芭农.*/, /.*(去完成|去浏览|去领取).*/);
 //    for(var i=0; i<2; i++){
 //        //向上滑动半屏
 //        swipe(device.width / 2, device.height/2, device.width / 2, 0, 1000);
@@ -1278,7 +1283,7 @@ function taobaoFarm_answer(){
     press(btn.x, btn.y, 1); sleep(2000)
     
     common.log('检查答案按钮'); ui.run(() => { w.text.setText('检查答案按钮'); });
-    var btn = clickable().className('android.widget.Button').depth(19).textMatches(/.+/).boundsInside(0,device.height/2,device.width,device.height).findOne(2000);
+    var btn = clickable().className('android.widget.Button').textMatches(/.+/).boundsInside(0,(1900/2440)*device.height,device.width,device.height).findOne(2000);
     if(!btn) throw new Error('超时未找到答案按钮');
     common.log('找到答案按钮，答案', btn.text(), '坐标', btn.bounds());
     
@@ -1321,7 +1326,7 @@ function taobaoFarm_browser(){
     browser_ad();
     
     for(var i=0;i<3;i++){
-        closeDialog(true);
+        //closeDialog();
         common.log('检查是否回到【集肥料任务列表弹窗】'); ui.run(() => { w.text.setText('检查是否回到【集肥料任务列表弹窗】'); });
         var btn = text('肥料明细').findOne(3000);
         if(btn) break;
@@ -1334,15 +1339,18 @@ function taobaoFarm_browser(){
 
 function taobaoFarm_intend(pattern, btnPattern){
     common.log('检查'+pattern); ui.run(() => { w.text.setText('检查'+pattern); });
-    var btn = common.clickOcr(pattern, {doClick:false,threshold:0.8,offset:{x:0,y:0}});
+    //var btn = common.clickOcr(pattern, {doClick:false,threshold:0.8,offset:{x:0,y:0}});
+    var btn = textMatches(pattern).findOnce();
     if(!btn){
         common.log('未找到'+pattern);
         return;
     }
-    common.log('找到', pattern, '，坐标', btn);
+    common.log('找到'+pattern, '，坐标', btn);
     
     common.log('检查'+pattern+'的'+btnPattern); ui.run(() => { w.text.setText('检查'+btnPattern); });
-    var btn = common.clickOcr(btnPattern, {doClick:true,threshold:0.8,region:[btn.x,btn.y,device.width,200]});
+    //var btn = common.clickOcr(btnPattern, {doClick:true,threshold:0.8,region:[btn.x,btn.y,device.width,200]});
+    var region = [btn.bounds().left,btn.bounds().top,device.width,200];
+    var btn = textMatches(btnPattern).boundsInside(region[0],region[1],region[0]+region[2],region[1]+region[3]).findOnce();
     if (!btn) {
         common.log('未找到'+btnPattern);
         return;
@@ -1350,7 +1358,8 @@ function taobaoFarm_intend(pattern, btnPattern){
     common.log('找到'+btnPattern+'，坐标', btn);
     
     common.log('点击'+btnPattern); ui.run(() => { w.text.setText('点击'+btnPattern); });
-    press(btn.x, btn.y, 1);sleep(10000);
+    //press(btn.x, btn.y, 1);sleep(10000);
+    common.clickIfParent(btn); sleep(10000);
         
     common.log('回到淘宝')
     launch('com.taobao.taobao'); sleep(7000)
@@ -1617,7 +1626,8 @@ function anti_antiBot(){
 
 function closeDialog(options){
     options = options||{};
-    var selectParams = textMatches(/^(关闭|关闭按钮)$/).boundsInside(0,device.height*1/5,device.width*2,device.height*2);
+    
+    var selectParams = textMatches(/^(关闭|关闭按钮)$/).boundsInside(0,device.height*1/2,device.width*2,device.height*2);
     
     var btn;
     if(options.dialog){
